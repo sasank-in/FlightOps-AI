@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ipynb_checkpoints/
+build/
+dist/
+
+# Environment / secrets
+.env
+
+# Data and artifacts (never commit raw or derived datasets)
+data/raw/*
+data/processed/*
+data/external/*
+!data/**/.gitkeep
+artifacts/models/*
+artifacts/reports/*
+!artifacts/**/.gitkeep
+mlruns/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

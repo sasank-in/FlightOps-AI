@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flightops"
+version = "0.1.0"
+description = "Flight telemetry analysis and anomaly detection (experimental, not a certified safety system)."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "numpy",
+    "pandas",
+    "pyyaml",
+]
+
+[project.scripts]
+flightops-inspect = "flightops.data.inspect:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

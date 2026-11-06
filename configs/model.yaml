@@ -1,0 +1,15 @@
+# Model configuration (Phase 2+). Placeholder until the dataset is verified.
+
+random_seed: 42
+
+split:
+  strategy: grouped        # grouped by flight id if available; see documentation.md section 14
+  group_column: null       # UNVERIFIED: metadata column identifying the source flight
+  validation_fraction: 0.15
+  test_fraction: 0.15
+
+isolation_forest:
+  n_estimators: 200
+  max_samples: auto
+  # contamination only shifts the decision threshold; it is not a prevalence estimate.
+  contamination: auto

@@ -1,0 +1,23 @@
+# Dataset configuration. Paths are relative to the project root.
+#
+# Fields marked UNVERIFIED must be filled in only after inspecting the real
+# files (run `python -m flightops.data.inspect`) and the official documentation.
+
+raw_dir: data/raw
+npz_file: DASHlink_full_fourclass_raw_comp.npz
+metadata_file: DASHlink_full_fourclass_raw_meta.csv
+
+# UNVERIFIED: array names inside the .npz archive.
+data_key: null
+label_key: null
+
+# UNVERIFIED: which axis of the telemetry array is time / features.
+time_axis: null
+feature_axis: null
+
+# Candidate values from the dataset description (used only as soft checks).
+expected:
+  n_samples: 99000      # approximate
+  n_timesteps: 160
+  n_features: 20
+  n_classes: 4
