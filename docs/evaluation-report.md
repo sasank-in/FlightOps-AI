@@ -142,8 +142,35 @@ v1 reports are archived in `artifacts/reports/v1/`.
   - Path High: altitude profile 6.5×, localizer 4.4×, glideslope 3.6× nominal;
   - Flaps Late: flap 47×;
   - Speed High: altitude, flap, airspeed.
-- **Pending:** a full GPU run (up to 60 epochs with early stopping, plus aircraft-held-out folds) via
-  `notebooks/05_autoencoder_cloud_gpu.ipynb`.
+### Final v2 results: Kaggle Tesla T4 run (2026-11-10)
+
+Both models were run with commit `74364d9` (model versions 0.2.0), on an identical split. The autoencoder
+ran 60 epochs at 3.3 s each; best validation loss 0.0883 (v1: 0.0940). The Isolation Forest results match
+the local CPU run exactly.
+
+| Model | Test PR-AUC | Without 657 | Aircraft held out PR-AUC | Aircraft held out FPR | Speed High | Path High | Flaps Late |
+|-------|------------:|------------:|-------------------------:|----------------------:|-----------:|----------:|-----------:|
+| **Isolation Forest v2** | **0.352** | **0.390** | **0.386 ± 0.041** | 0.051 ± 0.011 | 0.168 | 0.758 | 0.392 |
+| Autoencoder v2, mean-MSE score | 0.178 | 0.174 | 0.168 ± 0.017 | 0.065 ± 0.030 | 0.065 | 0.420 | 0.224 |
+| Autoencoder v2, top-3 channel z score* | 0.211 | 0.213 | not run | — | 0.071 | 0.450 | 0.462 |
+
+\* Post-hoc scoring of the saved per-channel errors. Each channel's error is normalised by its
+**nominal validation** median and IQR (no anomaly labels used), then the 3 largest are averaged.
+Threshold: same 5% nominal budget.
+
+**Conclusions**
+- Without the aircraft-657 shortcut, the autoencoder is only modestly better than random
+  (prevalence ≈ 0.10). Better reconstruction loss did not translate into better detection.
+- Its **per-channel errors are informative**:
+  - Flaps Late: flap error 30× nominal;
+  - Path High: altitude profile 10× and glideslope 6× nominal.
+
+  Averaging over 17 channels dilutes them, and per-channel normalised scoring recovers part of the
+  signal (Flaps Late detection 22% → 46%).
+- **Isolation Forest v2 is the selected detector** for the next phases. The autoencoder's per-channel
+  errors are kept as candidate *supporting evidence* for alerts, not as the detector.
+- Speed High stays hard for both models (17% / 7%). Part of this class is the questionable aircraft-657
+  labels, but Speed High on other aircraft is also detected poorly.
 
 ## Interpretation and next steps
 
