@@ -88,6 +88,28 @@ increase for Speed High are absolute heading/course (true-heading-cos error 24×
 aircraft 657, it detects only 8% of Speed High. Path High and Flaps Late errors do concentrate in
 the expected channels (altitude profile; flap 66× nominal).
 
+### Kaggle GPU run (Tesla T4, 2026-11-10): reproducibility and aircraft-held-out folds
+
+Run with `notebooks/05_autoencoder_cloud_gpu.ipynb` (`--aircraft-cv`). The software stack differed from
+the local one (Python 3.13.16, NumPy 2.1.3, PyTorch 2.11.0+cu130, scikit-learn 1.6.1).
+
+- **Reproducible:** the split fingerprint is identical to the local run, and test metrics match the local
+  CPU run to three decimals for both models.
+- **Speed:** about 3.9 s per epoch on the T4, against about 38 s on the local CPU (≈10×).
+
+| Aircraft held out (5 folds) | PR-AUC | Recall | FPR (target 0.05) | ROC-AUC |
+|-----------------------------|-------:|-------:|------------------:|--------:|
+| Isolation Forest | 0.342 ± 0.021 | 0.317 ± 0.073 | 0.051 ± 0.004 | 0.781 ± 0.066 |
+| Autoencoder | 0.229 ± 0.087 | 0.260 ± 0.100 | 0.065 ± 0.026 | 0.717 ± 0.027 |
+
+Autoencoder per fold: PR-AUC 0.17–0.21 on the four folds without aircraft 657, and **0.40 on the fold
+that holds 657 out**. There it detects 44% of Speed High, all through the faulty course channel. The
+autoencoder's false-positive rate also drifts on unseen aircraft (up to ~0.10), so its threshold
+transfers worse between aircraft than the forest's.
+
+**Conclusion:** autoencoder v0.1.0 is worse than the Isolation Forest and less stable across aircraft.
+Its only advantage comes from the aircraft-657 recording fault.
+
 **Next:** input channels v2 should drop the absolute heading/course channels, which encode runway
 direction and carry the 657 fault, and keep only relative ones such as turn rate and drift angle.
 Then retrain both models, ideally on a GPU with more epochs and aircraft-held-out folds.
