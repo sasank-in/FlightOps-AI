@@ -31,6 +31,17 @@ For WSL2/Linux, see section 8 of the documentation.
 3. Record the source, checksums, and array keys in [docs/dataset-card.md](docs/dataset-card.md).
 4. Set `data_key`, `label_key`, `time_axis`, and `feature_axis` in [configs/data.yaml](configs/data.yaml).
 5. Fill in [docs/data-dictionary.md](docs/data-dictionary.md) from the official documentation.
+6. Build the memory-mappable float32 working copy (~45 s, low RAM use):
+
+   ```powershell
+   python -m flightops.data.processed
+   ```
+
+7. Run the notebooks with the **FlightOps AI (Python 3.12)** kernel:
+   - [notebooks/01_dataset_overview.ipynb](notebooks/01_dataset_overview.ipynb): class balance, aircraft, airports, per-class behaviour
+   - [notebooks/02_data_quality.ipynb](notebooks/02_data_quality.ipynb): integrity, duplicates, variable issues, quality flags
+
+Steps 1–7 are complete. The data is downloaded and verified, and the findings are in the dataset card.
 
 ## Tests
 

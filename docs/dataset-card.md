@@ -1,6 +1,6 @@
 # Dataset Card: NASA DASHlink Curated 4 Class Anomaly Detection Data Set
 
-> Status: **Verified structure** (2026-11-10). Physical plausibility review in progress.
+> Status: **Verified structure and data-quality review complete** (2026-11-10).
 
 ## Source
 
@@ -71,41 +71,48 @@ The data is heavily imbalanced, so accuracy is not a useful metric (see document
 
 ### Grouping and leakage
 
-- `flight_record` is unique per row, so each window comes from a different flight
-  record and there are **no repeated windows per flight**.
-- `flight_record` looks like a structured ID (for example `652200101120916`). It
-  may encode an aircraft and a date/time, but this is **not documented**. Before
-  final evaluation, check whether splitting by any encoded aircraft or date changes
-  results.
-- 205 departure airports and 97 arrival airports. Consider an airport-held-out
-  split as a robustness check.
+- `flight_record` is unique per row, so there are no repeated windows per flight *record*.
+- **Inferred layout** (undocumented, but all 99,837 records match it): 3-digit aircraft id +
+  `YYYYMMDDHHMM`. This gives **35 aircraft** (2,236–3,474 windows each) and record
+  dates 1998–2010, mostly 2001–2004. Parsed by `flightops.data.quality.parse_flight_record`.
+- **Aircraft 657 is an outlier:** 89% of its windows are anomalous (2,237 Speed High),
+  which is about 32% of all Speed High labels. Other aircraft range 6.7–9%. A model
+  may learn aircraft identity, so evaluate with **aircraft held out** as well as with
+  a stratified split.
+- **97 exact duplicate window pairs** (identical telemetry, aircraft, route and label).
+  One copy is dated 2001–2002 and the other 2009, sometimes a day apart. They look
+  like the same flight stored twice, so drop the second copy before splitting. The
+  2009–2010 dates are suspect.
+- 205 departure airports and 97 arrival airports.
 
-## Known limitations and open questions
+## Data-quality findings (notebooks/02_data_quality.ipynb)
 
-Value ranges observed across all samples (see `data-dictionary.md` for the full table):
+Per-window flags are written to `artifacts/reports/data_quality_flags.csv`. None of
+these values have been removed or changed in the raw or processed data.
 
-1. **Flap position (idx 8)** is documented as "Discrete" but ranges 0–3766 with
-   median 3654 and thousands of distinct values. The encoding is unknown, so don't
-   treat it as degrees.
-2. **Aileron positions (idx 0, 1)** range 41.9–124.5 with median ~84, which is not
-   centred on 0 as expected for degrees of deflection. There may be an offset or
-   a different encoding.
-3. **True heading (idx 17)** spans −290 to +290, outside ±180 or 0–360. It may be
-   unwrapped, so check before any circular encoding.
-4. **Total pressure (idx 13)** has a minimum of −9.3 mbar, which is physically
-   impossible. This may be a sensor dropout.
-5. **Vertical acceleration (idx 18)** has a minimum of −4.03 g, which is likely spikes.
-6. **Baro altitude (idx 3)** ranges from −170 to 14,039 ft, wide for a window near
-   1,000 ft above touchdown.
-7. Glideslope and localizer deviation are documented as "Percentage" but range
-   ±0.8 and ±0.4, consistent with DDM units.
-8. Only snapshot-level labels exist. There are no event intervals, so event-level
-   metrics are not possible (documentation.md §14).
+| # | Variable | Finding | Phase 2 decision |
+|---|----------|---------|------------------|
+| 1 | Flap (8) | Raw position count, not degrees or detents: steps of ~110–125 while moving, final setting ~3,650–3,700. 43 windows have >1,000-count glitches | Continuous; derive time to reach ≥3,600; flag jumps |
+| 2 | Aileron LH/RH (0, 1) | Centred ~83–85, hard floor at 41.9, LH/RH correlation only 0.18. "Degree" does not match | Standardise only; low confidence in explanations; ask dataset owner |
+| 3 | True heading (17) | Degrees, but wrapping past ±180° is inconsistent (12.2% of windows reach ±290). Wrapping fixes all of them | Wrap to [-180, 180), then sin/cos; same for course and selected heading |
+| 4 | Total pressure (13) | 39 windows at 26–107 mbar for the whole window, **all from aircraft 684** (sensor fault) | Flag; exclude from nominal training |
+| 5 | Vertical accel (18) | 1–2-sample spikes outside [-1, 2.5] g in 10.7% of windows, similar rate in all classes | Robust statistics; optional median filter |
+| 6 | Altitude (3) | Barometric MSL. High values are high-elevation airports (KASE, KDEN, KSLC) | Use altitude relative to window end or airport |
+| 7 | Glideslope / localizer (9, 11) | Documented as "Percentage" but range ±0.8 / ±0.4, consistent with DDM | Use as-is |
+| 8 | Selected course / heading (5, 10) | Constant in 98% / 76% of windows | Low within-window information |
 
-None of these values have been removed or changed.
+### Other observations
+
+- Windows **end at touchdown** (flare and throttle cut in the last ~10 s) and start about
+  1,700–2,300 ft above that point.
+- Class behaviour matches the label names (time to final flaps, glideslope deviation,
+  approach speed). See `notebooks/01_dataset_overview.ipynb`.
+- Only snapshot-level labels exist. There are no event intervals, so event-level metrics
+  are not possible (documentation.md §14).
 
 ## Transformations applied
 
 | Version | Description | Date |
 |---------|-------------|------|
 | raw | Unmodified download (verified against archive digests) | 2026-11-10 |
+| processed v1 | `data/processed/telemetry_float32.npy` (float64→float32, max abs error 4.8e-4, max rel error 6.0e-8) and `labels_int8.npy`. Built by `python -m flightops.data.processed`; provenance in `manifest.json` | 2026-11-10 |

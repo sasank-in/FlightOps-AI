@@ -9,9 +9,9 @@ backend and frontend integration\
 **Primary language:** Python 3.12.10\
 **Project type:** Applied ML / Aerospace Data Analytics / AI
 Engineering\
-**Status:** Phase 1 in progress. Dataset downloaded and its structure
-verified on 2026-11-10 (see `docs/dataset-card.md`). EDA notebooks are
-pending.
+**Status:** Phase 1 in progress. Dataset verified and data-quality
+review completed on 2026-11-10 (see `docs/dataset-card.md`). The
+exploratory analysis notebook (03) is pending.
 
 ------------------------------------------------------------------------
 
