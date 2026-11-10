@@ -20,6 +20,9 @@ PRESSURE_INVALID_MBAR = 500.0
 FLAP_JUMP_COUNTS = 1000.0
 # Vertical acceleration outside this band (g) on final approach is treated as a spike.
 VERT_ACCEL_RANGE_G = (-1.0, 2.5)
+# At touchdown the aircraft is aligned with the runway, so heading and the selected
+# (ILS) course should agree within a few degrees. Larger gaps mean a faulty course recording.
+COURSE_MISMATCH_DEG = 30.0
 
 
 def parse_flight_record(flight_record: pd.Series) -> pd.DataFrame:
@@ -60,7 +63,7 @@ def wrap_degrees(angle: np.ndarray) -> np.ndarray:
 def window_quality_flags(X: np.ndarray, batch_size: int = 8192) -> pd.DataFrame:
     """Compute per-window quality flags for X of shape (windows, time, 20 features)."""
     cols: dict[str, list] = {k: [] for k in (
-        "pressure_invalid", "flap_jump", "heading_out_of_range", "vert_accel_spikes"
+        "pressure_invalid", "flap_jump", "heading_out_of_range", "vert_accel_spikes", "course_mismatch"
     )}
     lo, hi = VERT_ACCEL_RANGE_G
     for start in range(0, X.shape[0], batch_size):
@@ -70,4 +73,6 @@ def window_quality_flags(X: np.ndarray, batch_size: int = 8192) -> pd.DataFrame:
         cols["heading_out_of_range"].append((np.abs(b[:, :, IDX["true_heading"]]) > 180).any(axis=1))
         va = b[:, :, IDX["vert_accel"]]
         cols["vert_accel_spikes"].append(((va < lo) | (va > hi)).sum(axis=1))
+        gap = np.abs(wrap_degrees(b[:, -10:, IDX["true_heading"]] - b[:, -10:, IDX["selected_course"]]))
+        cols["course_mismatch"].append(np.median(gap, axis=1) > COURSE_MISMATCH_DEG)
     return pd.DataFrame({k: np.concatenate(v) for k, v in cols.items()})

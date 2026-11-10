@@ -67,6 +67,31 @@ These labels may follow an aircraft-specific rule or may be wrong. This cannot b
 dataset, so it has been raised as an open question for the dataset POC. Future results should be
 reported both with and without aircraft 657.
 
+## Conv autoencoder v0.1.0 (CPU run, 2026-11-10)
+
+Reproduce: `python -m flightops.models.train_autoencoder` (full run 20 min on CPU, 30 epochs × ~38 s).
+Input: 23 preprocessed channels × 160 s, standardised on training nominal windows. Same split as the
+forest (identical `split_fingerprint`), same training windows and threshold policy.
+
+| Model / test subset | Precision | Recall | PR-AUC | ROC-AUC | Speed High | Path High | Flaps Late |
+|---------------------|----------:|-------:|-------:|--------:|-----------:|----------:|-----------:|
+| Isolation Forest, all | 0.394 | 0.294 | 0.324 | 0.758 | 0.142 | 0.755 | 0.343 |
+| Autoencoder, all | 0.395 | 0.292 | 0.279 | 0.744 | 0.240 | 0.495 | 0.203 |
+| Isolation Forest, without 657 | 0.386 | 0.365 | 0.349 | 0.815 | 0.186 | 0.755 | 0.343 |
+| Autoencoder, without 657 | 0.270 | 0.213 | 0.192 | 0.713 | 0.083 | 0.495 | 0.203 |
+
+Validation loss was still decreasing at epoch 30 (0.094), so the model is under-trained.
+
+**The autoencoder's apparent Speed High gain is an artifact.** It flags aircraft 657's Speed High
+windows (56%) because of the faulty *selected course* channel. The channels with the largest error
+increase for Speed High are absolute heading/course (true-heading-cos error 24× nominal). Without
+aircraft 657, it detects only 8% of Speed High. Path High and Flaps Late errors do concentrate in
+the expected channels (altitude profile; flap 66× nominal).
+
+**Next:** input channels v2 should drop the absolute heading/course channels, which encode runway
+direction and carry the 657 fault, and keep only relative ones such as turn rate and drift angle.
+Then retrain both models, ideally on a GPU with more epochs and aircraft-held-out folds.
+
 ## Interpretation and next steps
 
 - The baseline is clearly better than random but weak for Speed High and Flaps Late.

@@ -6,18 +6,34 @@ control, maintenance, or certified flight-safety system.
 The full plan is in [documentation.md](documentation.md). The project is currently in **Phase 1
 (dataset acquisition and inspection)**.
 
-## Setup (Windows PowerShell)
+## Setup: conda env `environ` (Windows, CPU PyTorch)
+
+The project runs in the existing conda env `environ` (Python 3.12, PyTorch CPU build):
 
 ```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -r requirements-lock.txt   # or requirements.txt for latest versions
+conda activate environ
+$env:PYTHONNOUSERSITE = "1"     # ignore packages in %APPDATA%\Python (a broken ipykernel lives there)
+python -m pip install -r requirements.txt
 python -m pip install -e .
-python -m ipykernel install --user --name flightops-ai --display-name "FlightOps AI (Python 3.12)"
+# PyTorch CPU (already installed in environ):
+# python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+python -m ipykernel install --user --name flightops-ai --display-name "FlightOps AI (conda: environ)"
 ```
 
-For WSL2/Linux, see section 8 of the documentation.
+The Jupyter kernel `flightops-ai` points at `environ` and sets `PYTHONNOUSERSITE=1` itself. The env also
+sets it on `conda activate`, via `conda env config vars set PYTHONNOUSERSITE=1 -n environ`, so the manual
+line above is only needed outside an activated env.
+
+A plain venv also works (`py -3.12 -m venv .venv`, then the same pip commands). For WSL2/Linux,
+see section 8 of the documentation.
+
+## Getting the data
+
+```powershell
+python -m flightops.data.download   # official NASA URL, else the verified archive copy; SHA-256 checked
+```
+
+The dataset is never committed or re-hosted (licence listed as "N/A"; 1.7 GB).
 
 ## Phase 1 workflow
 
@@ -52,6 +68,24 @@ python -m flightops.models.train_baseline   # ~1 min: features, splits, Isolatio
 - [notebooks/03_exploratory_analysis.ipynb](notebooks/03_exploratory_analysis.ipynb): variability, correlation, class separation, aircraft 657
 - [notebooks/04_baseline_anomaly_detection.ipynb](notebooks/04_baseline_anomaly_detection.ipynb): baseline results
 - [docs/evaluation-report.md](docs/evaluation-report.md): metrics, threshold policy, label concern
+
+## Phase 3: autoencoder (CPU or cloud GPU)
+
+```powershell
+python -m flightops.models.train_autoencoder --smoke          # 1-minute pipeline check
+python -m flightops.models.train_autoencoder                  # full run: ~15-20 min on CPU
+python -m flightops.models.train_autoencoder --aircraft-cv    # + 5 aircraft-held-out folds (GPU recommended)
+```
+
+### Training on a cloud GPU (Colab or Kaggle)
+
+1. Package the code (no data, no secrets): `git archive --format=zip -o dist/flightops_src.zip HEAD`
+2. Open [notebooks/05_autoencoder_cloud_gpu.ipynb](notebooks/05_autoencoder_cloud_gpu.ipynb) in Colab
+   (*File → Upload notebook*) or Kaggle, and enable a GPU runtime.
+3. *Run all*. Upload `flightops_src.zip` when prompted, or set `CODE_SOURCE = "git"` if the branch is pushed
+   to a repo the runtime can reach. The notebook downloads and verifies the dataset itself (raw files are
+   cached in Google Drive on Colab).
+4. Download `flightops_results.zip` and unzip it at the repo root. It contains only `artifacts/`.
 
 ## Tests
 

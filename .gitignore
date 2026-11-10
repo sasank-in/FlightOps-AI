@@ -20,6 +20,8 @@ artifacts/models/*
 artifacts/reports/*
 !artifacts/**/.gitkeep
 mlruns/
+flightops_src*.zip
+flightops_results*.zip
 
 # Editors / OS
 .vscode/

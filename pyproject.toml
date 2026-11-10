@@ -6,15 +6,24 @@ build-backend = "setuptools.build_meta"
 name = "flightops"
 version = "0.1.0"
 description = "Flight telemetry analysis and anomaly detection (experimental, not a certified safety system)."
-requires-python = ">=3.12,<3.13"
+# Developed on 3.12; >=3.11 so the package installs on Colab/Kaggle runtimes.
+requires-python = ">=3.11"
 dependencies = [
     "numpy",
     "pandas",
     "pyyaml",
+    "scikit-learn",
+    "joblib",
 ]
+
+[project.optional-dependencies]
+# CPU: pip install torch --index-url https://download.pytorch.org/whl/cpu
+# GPU clouds (Colab/Kaggle) already ship a CUDA build of torch.
+dl = ["torch"]
 
 [project.scripts]
 flightops-inspect = "flightops.data.inspect:main"
+flightops-download = "flightops.data.download:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

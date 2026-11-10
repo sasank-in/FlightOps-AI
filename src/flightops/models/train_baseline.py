@@ -19,26 +19,18 @@ import time
 from datetime import datetime, timezone
 
 import numpy as np
-import pandas as pd
 import sklearn
 import yaml
 
 from flightops import __version__
-from flightops.config import load_data_config, project_root
-from flightops.data.processed import load_processed
-from flightops.data.quality import duplicate_mask, parse_flight_record, window_quality_flags
+from flightops.config import project_root
 from flightops.data.schema import LABELS
-from flightops.data.splits import TEST, TRAIN, VAL, aircraft_folds, split_summary, stratified_split
-from flightops.evaluation.metrics import best_f1_threshold, binary_metrics, per_class_alert_rate, threshold_at_fpr
+from flightops.data.splits import TEST, TRAIN, VAL, aircraft_folds, split_summary
+from flightops.evaluation.metrics import best_f1_threshold, threshold_at_fpr
 from flightops.features.build_features import FEATURE_SET_VERSION, load_or_build_features
 from flightops.models.isolation_forest import MODEL_NAME, MODEL_VERSION, IForestDetector
-
-
-def _evaluate(labels, scores, threshold) -> dict:
-    return {
-        "binary": binary_metrics(labels, scores, threshold),
-        "alert_rate_by_class": per_class_alert_rate(labels, scores, threshold, LABELS),
-    }
+from flightops.pipeline import evaluate as _evaluate
+from flightops.pipeline import evaluate_with_and_without_concern, load_experiment_data
 
 
 def run_baseline(model_cfg: dict) -> tuple[dict, IForestDetector, dict]:
@@ -47,22 +39,17 @@ def run_baseline(model_cfg: dict) -> tuple[dict, IForestDetector, dict]:
     if_cfg = model_cfg["isolation_forest"]
     root = project_root()
 
-    cfg = load_data_config()
-    X, y = load_processed()
-    meta = pd.read_csv(cfg.metadata_path, dtype={"flight_record": str})
-    aircraft = parse_flight_record(meta["flight_record"])["aircraft_id"].to_numpy()
+    data = load_experiment_data(model_cfg)
+    X, y, aircraft, duplicate, pressure_invalid, split = (
+        data.X, data.y, data.aircraft, data.duplicate, data.pressure_invalid, data.split)
     F = load_or_build_features(X, root / "data" / "processed")
     names = list(F.columns)
     F = F.to_numpy()
-    duplicate = duplicate_mask(X)
-    pressure_invalid = window_quality_flags(X)["pressure_invalid"].to_numpy()
 
     def detector():
         return IForestDetector(n_estimators=if_cfg["n_estimators"], max_samples=if_cfg["max_samples"], random_state=seed)
 
     # --- Primary: stratified split -------------------------------------------------
-    split = stratified_split(y, duplicate, model_cfg["split"]["validation_fraction"],
-                             model_cfg["split"]["test_fraction"], seed)
     fit_mask = (split == TRAIN) & (y == 0) & ~pressure_invalid
     t0 = time.perf_counter()
     det = detector().fit(F[fit_mask], names)
@@ -74,11 +61,13 @@ def run_baseline(model_cfg: dict) -> tuple[dict, IForestDetector, dict]:
     f1_threshold = best_f1_threshold(y[val] > 0, scores[val])
 
     primary = {
+        "split_fingerprint": data.split_fingerprint,
         "split_counts": split_summary(split, y, LABELS).to_dict(orient="index"),
         "n_fit_windows": int(fit_mask.sum()),
         "fit_seconds": round(fit_seconds, 2),
         "validation_at_budget": _evaluate(y[val], scores[val], det.threshold),
         "test_at_budget": _evaluate(y[test], scores[test], det.threshold),
+        "test_at_budget_by_subset": evaluate_with_and_without_concern(data, test, scores, det.threshold),
         "test_at_val_best_f1_threshold": _evaluate(y[test], scores[test], f1_threshold),
     }
 

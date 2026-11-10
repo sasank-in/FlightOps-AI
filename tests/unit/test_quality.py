@@ -42,8 +42,13 @@ def test_window_quality_flags():
     X[1, 3, IDX["flap"]] = 3700                  # flap jump 0 -> 3700 -> 0
     X[2, 2, IDX["true_heading"]] = 200           # out of range heading
     X[2, 1, IDX["vert_accel"]] = -3.0            # one spike
+    X[0, :, IDX["true_heading"]] = 178.0
+    X[0, :, IDX["selected_course"]] = -178.0     # 4 deg apart across the wrap: consistent
+    X[1, :, IDX["selected_course"]] = 95.0       # heading 0 vs course 95: mismatch
 
     flags = window_quality_flags(X, batch_size=2)
+
+    assert flags.course_mismatch.tolist() == [False, True, False]
 
     assert flags.pressure_invalid.tolist() == [True, False, False]
     assert flags.flap_jump.tolist() == [False, True, False]

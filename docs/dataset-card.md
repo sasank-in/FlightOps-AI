@@ -75,11 +75,21 @@ The data is heavily imbalanced, so accuracy is not a useful metric (see document
 - **Inferred layout** (undocumented, but all 99,837 records match it): 3-digit aircraft id +
   `YYYYMMDDHHMM`. This gives **35 aircraft** (2,236–3,474 windows each) and record
   dates 1998–2010, mostly 2001–2004. Parsed by `flightops.data.quality.parse_flight_record`.
-- **Aircraft 657 is an outlier, and its labels are questionable:** 89% of its windows are
+- **Aircraft 657: faulty recording, and its labels are probably wrong.** 89% of its windows are
   anomalous (2,237 Speed High), about 32% of all Speed High labels. Other aircraft range
-  6.7–9%. Its Speed High windows match nominal approaches in airspeed, flap timing and
-  throttle (notebook 03), and the baseline flags them at the nominal false-alarm rate. Evaluate
-  with **aircraft held out**, report results with and without 657, and ask the dataset POC.
+  6.7–9%. Those Speed High windows match nominal approaches in airspeed, flap timing and
+  throttle (notebook 03).
+  - **Root cause found (2026-11-10):** in its 2001–2002 windows, the **selected course** channel
+    is wrong. At touchdown it is a median 110° from the runway direction, scattered in every
+    direction, while true heading matches the runway (3°). Every one of 657's 2001–2002
+    windows is labelled Speed High (nearly all), and its only nominal windows are from 2003,
+    when the course channel is correct.
+  - The Speed High labels on 657 most likely come from this recording fault, not from real
+    high-speed approaches.
+  - The `course_mismatch` flag (median |heading − selected course| over the last 10 s > 30°)
+    marks 4,252 windows: 1,851 from aircraft 657, and at most ~100 for any other aircraft.
+  - **Decisions:** report results with and without aircraft 657; don't use absolute
+    course/heading channels as model inputs; raise the issue with the dataset POC.
 - **97 exact duplicate window pairs** (identical telemetry, aircraft, route and label).
   One copy is dated 2001–2002 and the other 2009, sometimes a day apart. They look
   like the same flight stored twice, so drop the second copy before splitting. The
@@ -100,7 +110,7 @@ these values have been removed or changed in the raw or processed data.
 | 5 | Vertical accel (18) | 1–2-sample spikes outside [-1, 2.5] g in 10.7% of windows, similar rate in all classes | Robust statistics; optional median filter |
 | 6 | Altitude (3) | Barometric MSL. High values are high-elevation airports (KASE, KDEN, KSLC) | Use altitude relative to window end or airport |
 | 7 | Glideslope / localizer (9, 11) | Documented as "Percentage" but range ±0.8 / ±0.4, consistent with DDM | Use as-is |
-| 8 | Selected course / heading (5, 10) | Constant in 98% / 76% of windows | Low within-window information |
+| 8 | Selected course / heading (5, 10) | Constant in 98% / 76% of windows. The course is faulty on aircraft 657 in 2001–2002 | Don't use as model inputs (they encode runway direction and carry the 657 fault); use `course_mismatch` as a quality flag |
 
 ### Other observations
 

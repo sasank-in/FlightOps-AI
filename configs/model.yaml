@@ -14,6 +14,17 @@ threshold:
   # Chosen from nominal data only, so it needs no anomaly labels.
   target_fpr: 0.05
 
+autoencoder:
+  # 1D-conv sequence autoencoder on 23 preprocessed channels x 160 s (flightops.models.autoencoder).
+  # Trained on the same nominal windows as the forest; early stopping on nominal validation loss.
+  width: 64
+  latent_channels: 8      # bottleneck 8 x 20 = 160 values (23x compression)
+  epochs: 30
+  batch_size: 256
+  lr: 0.001
+  weight_decay: 0.00001
+  patience: 5
+
 isolation_forest:
   n_estimators: 200
   max_samples: auto

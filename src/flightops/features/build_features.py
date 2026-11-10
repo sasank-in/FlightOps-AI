@@ -114,6 +114,30 @@ def save_features(df: pd.DataFrame, out_dir: str | Path) -> Path:
     return path
 
 
+def load_or_build_channels(
+    X: np.ndarray, out_dir: str | Path, batch_size: int = 4096, median_filter_vert_accel: bool = True
+) -> np.ndarray:
+    """Preprocessed per-second channels (windows, time, C) as a cached float32 memmap.
+
+    Built in batches so peak memory stays small. About 1.5 GB on disk for the full dataset.
+    """
+    path = Path(out_dir) / f"channels_{FEATURE_SET_VERSION}.npy"
+    shape = (X.shape[0], X.shape[1], len(channel_names()))
+    if path.exists():
+        arr = np.load(path, mmap_mode="r", allow_pickle=False)
+        if arr.shape == shape:
+            return arr
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp.npy")
+    out = np.lib.format.open_memmap(tmp, mode="w+", dtype=np.float32, shape=shape)
+    for s in range(0, X.shape[0], batch_size):
+        out[s : s + batch_size] = preprocess_batch(X[s : s + batch_size], median_filter_vert_accel)
+    out.flush()
+    del out
+    tmp.replace(path)
+    return np.load(path, mmap_mode="r", allow_pickle=False)
+
+
 def load_or_build_features(X: np.ndarray, out_dir: str | Path) -> pd.DataFrame:
     """Load cached features if they match the current feature set, else build and cache."""
     path = Path(out_dir) / f"window_features_{FEATURE_SET_VERSION}.npy"
