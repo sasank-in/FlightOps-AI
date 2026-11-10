@@ -9,8 +9,9 @@ backend and frontend integration\
 **Primary language:** Python 3.12.10\
 **Project type:** Applied ML / Aerospace Data Analytics / AI
 Engineering\
-**Status:** Development blueprint --- implementation and dataset
-validation are pending
+**Status:** Phase 1 in progress. Dataset downloaded and its structure
+verified on 2026-11-10 (see `docs/dataset-card.md`). EDA notebooks are
+pending.
 
 ------------------------------------------------------------------------
 
@@ -131,20 +132,37 @@ being treated as final project facts.
 Candidate files:
 
 ``` text
-DASHlink_full_fourclass_raw_comp.npz
-DASHlink_full_fourclass_raw_meta.csv
+DASHlink_full_fourclass_raw_comp.npz      (~1.6 GB)
+DASHlink_full_fourclass_raw_meta.csv      (~3.9 MB)
+DASHlink_full_data_documentation.pdf      (official data documentation)
 ```
 
-Candidate source pages:
+Official source:
 
--   NASA DASHlink: https://c3.nasa.gov/dashlink/
--   NASA DASHlink data and publications:
-    https://c3.nasa.gov/dashlink/resources/
--   Search the NASA DASHlink site for the curated four-class anomaly
-    dataset and its associated documentation.
+-   Dataset page: **Curated 4 Class Anomaly Detection Data Set**
+    https://c3.ndc.nasa.gov/dashlink/resources/1018/ (shared by Bryan
+    Matthews, NASA Ames; license listed as "N/A")
+-   File URLs:
+    `https://c3.ndc.nasa.gov/dashlink/static/media/dataset/<file name>`
+-   DASHlink moved from `c3.nasa.gov` to `c3.ndc.nasa.gov`; the old
+    domain no longer serves the site.
+
+**Fallback when the NASA server is unreachable:** the Internet Archive
+holds byte-for-byte captures of the official file URLs. Use a raw
+(`id_`) capture, for example:
+
+``` text
+https://web.archive.org/web/20260426172441id_/https://c3.ndc.nasa.gov/dashlink/static/media/dataset/DASHlink_full_fourclass_raw_comp.npz
+```
+
+Only use a capture whose Wayback digest appears on several snapshots,
+because truncated partial captures also exist. Verify the downloaded file
+against that digest (base32-encoded SHA-1), then record both the archive
+URL and the original NASA URL in `docs/dataset-card.md`.
 
 **Acquisition rule:** Download data only from the dataset's official
-NASA-hosted page or an explicitly linked official repository. Record the
+NASA-hosted page, an explicitly linked official repository, or a
+verified archival copy of the official file URLs (see above). Record the
 exact download URL, access date, file size, checksum, license/usage
 terms, and documentation version in `docs/dataset-card.md`.
 
@@ -153,15 +171,18 @@ shape is correct until it has been inspected.
 
 ### 4.2 Dataset Characteristics to Verify
 
-| Item | Expected / candidate value | Verification |
-|------|----------------------------|--------------|
-| Number of snapshots | Approximately 99,000 | Inspect array shape |
-| Window duration | 160 seconds | Inspect time dimension and docs |
-| Sampling frequency | 1 Hz | Verify documentation |
-| Number of variables | 20 | Verify feature axis |
-| Number of classes | 4 | Inspect unique labels |
-| Data format | NumPy archive (`.npz`) | Inspect archive keys |
-| Metadata | CSV | Inspect columns and row alignment |
+| Item | Expected / candidate value | Verified (2026-11-10) |
+|------|----------------------------|-----------------------|
+| Number of snapshots | Approximately 99,000 | 99,837 |
+| Window duration | 160 seconds | 160 (time axis = 1) |
+| Sampling frequency | 1 Hz | 1 Hz (window "in seconds", per official docs) |
+| Number of variables | 20 | 20 (feature axis = 2) |
+| Number of classes | 4 | 4: 0 Nominal 89.8%, 1 Speed High 7.0%, 2 Path High 2.2%, 3 Flaps Late 1.0% |
+| Data format | NumPy archive (`.npz`) | Keys `data` (float64) and `label` (float64) |
+| Metadata | CSV | 99,837 rows, aligned 1:1 with arrays; `flight_record` unique per row |
+
+Full details, checksums, and open data-quality questions are in
+`docs/dataset-card.md` and `docs/data-dictionary.md`.
 
 **Memory note:** at the candidate size (99,000 × 160 × 20 values), the
 array is roughly 2.4 GB as float64 or 1.2 GB as float32. Arrays inside an
@@ -988,6 +1009,12 @@ Prefer flight-grouped splits when flight identifiers are available. If
 they are not available, document the limitation and investigate metadata
 for grouping information.
 
+**Verified for this dataset:** `flight_record` is unique per window, so
+there are no repeated windows per flight. Use a stratified split, given
+the 1% minority class. As robustness checks, also try airport-held-out
+splits, and splits by aircraft or date if the undocumented
+`flight_record` encoding can be confirmed.
+
 ------------------------------------------------------------------------
 
 ## 15. Anomaly Event Contract
@@ -1431,8 +1458,11 @@ definitions, labels, and split strategy are understood.**
 
 ## 27. References
 
--   NASA DASHlink: https://c3.nasa.gov/dashlink/
--   NASA DASHlink resources: https://c3.nasa.gov/dashlink/resources/
+-   NASA DASHlink: https://c3.ndc.nasa.gov/dashlink/
+-   Curated 4 Class Anomaly Detection Data Set:
+    https://c3.ndc.nasa.gov/dashlink/resources/1018/
+-   Internet Archive captures of the dataset files:
+    https://web.archive.org/web/*/c3.ndc.nasa.gov/dashlink/static/media/dataset/DASHlink_full*
 -   PyTorch installation: https://pytorch.org/get-started/locally/
 -   Python documentation: https://docs.python.org/3.12/
 -   NumPy documentation: https://numpy.org/doc/

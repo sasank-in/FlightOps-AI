@@ -28,6 +28,8 @@ class DataConfig:
     label_key: str | None = None
     time_axis: int | None = None
     feature_axis: int | None = None
+    metadata_label_column: str | None = None
+    labels: dict[int, str] = field(default_factory=dict)
     expected: dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -67,5 +69,7 @@ def load_data_config(path: str | Path | None = None, root: Path | None = None) -
         label_key=raw.get("label_key"),
         time_axis=raw.get("time_axis"),
         feature_axis=raw.get("feature_axis"),
+        metadata_label_column=raw.get("metadata_label_column"),
+        labels={int(k): str(v) for k, v in (raw.get("labels") or {}).items()},
         expected=raw.get("expected") or {},
     )
