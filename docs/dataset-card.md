@@ -75,10 +75,11 @@ The data is heavily imbalanced, so accuracy is not a useful metric (see document
 - **Inferred layout** (undocumented, but all 99,837 records match it): 3-digit aircraft id +
   `YYYYMMDDHHMM`. This gives **35 aircraft** (2,236–3,474 windows each) and record
   dates 1998–2010, mostly 2001–2004. Parsed by `flightops.data.quality.parse_flight_record`.
-- **Aircraft 657 is an outlier:** 89% of its windows are anomalous (2,237 Speed High),
-  which is about 32% of all Speed High labels. Other aircraft range 6.7–9%. A model
-  may learn aircraft identity, so evaluate with **aircraft held out** as well as with
-  a stratified split.
+- **Aircraft 657 is an outlier, and its labels are questionable:** 89% of its windows are
+  anomalous (2,237 Speed High), about 32% of all Speed High labels. Other aircraft range
+  6.7–9%. Its Speed High windows match nominal approaches in airspeed, flap timing and
+  throttle (notebook 03), and the baseline flags them at the nominal false-alarm rate. Evaluate
+  with **aircraft held out**, report results with and without 657, and ask the dataset POC.
 - **97 exact duplicate window pairs** (identical telemetry, aircraft, route and label).
   One copy is dated 2001–2002 and the other 2009, sometimes a day apart. They look
   like the same flight stored twice, so drop the second copy before splitting. The

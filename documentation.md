@@ -9,9 +9,10 @@ backend and frontend integration\
 **Primary language:** Python 3.12.10\
 **Project type:** Applied ML / Aerospace Data Analytics / AI
 Engineering\
-**Status:** Phase 1 in progress. Dataset verified and data-quality
-review completed on 2026-11-10 (see `docs/dataset-card.md`). The
-exploratory analysis notebook (03) is pending.
+**Status:** Phases 1--2 complete (2026-11-10). The dataset is verified, EDA
+is done, and the Isolation Forest baseline is evaluated (see
+`docs/dataset-card.md` and `docs/evaluation-report.md`). Phase 3
+(autoencoder and model comparison) is next.
 
 ------------------------------------------------------------------------
 
@@ -1339,25 +1340,25 @@ Do not commit:
 
 ### Phase 1 --- Data foundation
 
--   [ ] Official dataset source recorded.
--   [ ] Usage terms reviewed.
--   [ ] Files downloaded and checksummed.
--   [ ] Python environment reproducible.
--   [ ] Array shapes and feature axis verified.
--   [ ] Labels and metadata alignment verified.
--   [ ] Data dictionary documented.
--   [ ] Missing and non-finite values assessed.
--   [ ] EDA charts generated.
--   [ ] Dataset limitations documented.
+-   [x] Official dataset source recorded.
+-   [x] Usage terms reviewed.
+-   [x] Files downloaded and checksummed.
+-   [x] Python environment reproducible.
+-   [x] Array shapes and feature axis verified.
+-   [x] Labels and metadata alignment verified.
+-   [x] Data dictionary documented.
+-   [x] Missing and non-finite values assessed.
+-   [x] EDA charts generated.
+-   [x] Dataset limitations documented.
 
 ### Phase 2 --- Baseline ML
 
--   [ ] Preprocessing pipeline implemented.
--   [ ] Train/validation/test strategy documented.
--   [ ] Leakage risks assessed.
--   [ ] Isolation Forest trained.
--   [ ] Threshold selection documented.
--   [ ] Evaluation report generated.
+-   [x] Preprocessing pipeline implemented.
+-   [x] Train/validation/test strategy documented.
+-   [x] Leakage risks assessed.
+-   [x] Isolation Forest trained.
+-   [x] Threshold selection documented.
+-   [x] Evaluation report generated.
 
 ### Phase 3 --- Advanced ML
 

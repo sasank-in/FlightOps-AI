@@ -43,6 +43,16 @@ For WSL2/Linux, see section 8 of the documentation.
 
 Steps 1–7 are complete. The data is downloaded and verified, and the findings are in the dataset card.
 
+## Phase 2: baseline
+
+```powershell
+python -m flightops.models.train_baseline   # ~1 min: features, splits, Isolation Forest, evaluation
+```
+
+- [notebooks/03_exploratory_analysis.ipynb](notebooks/03_exploratory_analysis.ipynb): variability, correlation, class separation, aircraft 657
+- [notebooks/04_baseline_anomaly_detection.ipynb](notebooks/04_baseline_anomaly_detection.ipynb): baseline results
+- [docs/evaluation-report.md](docs/evaluation-report.md): metrics, threshold policy, label concern
+
 ## Tests
 
 ```powershell

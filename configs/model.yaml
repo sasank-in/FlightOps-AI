@@ -1,15 +1,20 @@
-# Model configuration (Phase 2+). Placeholder until the dataset is verified.
+# Model configuration. See documentation.md §13-14 and docs/dataset-card.md.
 
 random_seed: 42
 
 split:
-  strategy: grouped        # grouped by flight id if available; see documentation.md section 14
-  group_column: null       # UNVERIFIED: metadata column identifying the source flight
+  # Primary: stratified by label after dropping duplicate windows.
   validation_fraction: 0.15
   test_fraction: 0.15
+  # Robustness: whole aircraft held out (aircraft id parsed from flight_record).
+  aircraft_cv_folds: 5
+
+threshold:
+  # Alert budget: flag this share of NOMINAL validation windows.
+  # Chosen from nominal data only, so it needs no anomaly labels.
+  target_fpr: 0.05
 
 isolation_forest:
   n_estimators: 200
   max_samples: auto
-  # contamination only shifts the decision threshold; it is not a prevalence estimate.
-  contamination: auto
+  # Training set: nominal windows in the training split, excluding pressure_invalid windows.
