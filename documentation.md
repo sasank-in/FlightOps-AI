@@ -11,7 +11,8 @@ backend and frontend integration\
 Engineering\
 **Status (2026-11-10):** Phases 1--4 complete.
 - Data is verified (`docs/dataset-card.md`).
-- Isolation Forest v2 is the selected detector; the autoencoder was compared
+- The served detector is `if_tail_hybrid` 0.4.0 (Isolation Forest + per-feature tail rule, input
+  set v3, per-aircraft sensor offsets removed); the autoencoder was compared
   (`docs/evaluation-report.md`).
 - The FastAPI inference service is running locally (`docs/api-contracts.md`).
 
@@ -1370,7 +1371,8 @@ Do not commit:
     did not beat the forest).
 -   [x] Models compared fairly (identical split fingerprint, threshold policy and aircraft folds).
 -   [x] Error analysis completed (aircraft-657 course fault, heading corruption, per-channel errors).
--   [x] Model artifacts versioned (model 0.2.0, input set v2; v1 reports archived).
+-   [x] Model artifacts versioned (models 0.4.0, input set v3; v1 and v2 reports archived in
+    `artifacts/reports/v1/`, `v2/`).
 
 ### Phase 4--8 --- Product delivery
 

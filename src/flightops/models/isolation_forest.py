@@ -16,7 +16,9 @@ from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
 
 MODEL_NAME = "isolation_forest"
-MODEL_VERSION = "0.2.0"  # 0.2.0: feature set v2 (no absolute heading/course inputs)
+# 0.2.0: feature set v2 (no absolute heading/course inputs)
+# 0.4.0: feature set v3 (per-aircraft offsets removed: flap, elevator, ailerons, rudder relative)
+MODEL_VERSION = "0.4.0"
 
 
 @dataclass

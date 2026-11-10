@@ -24,7 +24,8 @@ import numpy as np
 from flightops.models.isolation_forest import IForestDetector
 
 MODEL_NAME = "if_tail_hybrid"
-MODEL_VERSION = "0.3.0"
+# 0.3.0: feature set v2 (did not transfer to unseen aircraft); 0.4.0: feature set v3
+MODEL_VERSION = "0.4.0"
 TOP_K = 3
 
 

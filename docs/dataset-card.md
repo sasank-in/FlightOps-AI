@@ -112,6 +112,21 @@ these values have been removed or changed in the raw or processed data.
 | 7 | Glideslope / localizer (9, 11) | Documented as "Percentage" but range ±0.8 / ±0.4, consistent with DDM | Use as-is |
 | 8 | Selected course / heading (5, 10) | Constant in 98% / 76% of windows. The course is faulty on aircraft 657 in 2001–2002 | Don't use as model inputs (they encode runway direction and carry the 657 fault); use `course_mismatch` as a quality flag |
 
+### Per-aircraft sensor offsets (found 2026-11-10)
+
+Offset ratio = spread of per-aircraft nominal medians / typical within-aircraft spread (nominal windows).
+
+| Variable | Ratio | Per-aircraft nominal level | Handling (input set v3) |
+|----------|------:|----------------------------|-------------------------|
+| Flap, final value | 47.1 | 3,586 (aircraft 661) to 3,745 (aircraft 667) raw counts | Relative to window-end value |
+| Elevator LH | 4.6 | **Aircraft 655: −40.6°** (at the sensor floor); others −8.0° to +2.6° | Relative to window median |
+| Aileron LH / RH | 2.2 / 1.7 | 81–87 | Relative to window median |
+| Rudder | 1.4 | −2.0° to +1.7° | Relative to window median |
+| Vertical acceleration | 0.81 | **Aircraft 685: 0.90 g** in steady approach; fleet 0.99 g | Relative to window median |
+
+These look like per-airframe calibration or sensor faults, not flight behaviour. A model that sees
+absolute levels flags normal flights of unseen aircraft (up to 31% false alarms in testing).
+
 ### Other observations
 
 - Windows **end at touchdown** (flare and throttle cut in the last ~10 s) and start about

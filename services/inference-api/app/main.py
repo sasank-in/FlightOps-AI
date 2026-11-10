@@ -1,6 +1,7 @@
 """FlightOps AI inference API (Phase 4).
 
-Serves the selected detector (Isolation Forest v2) behind validated endpoints.
+Serves the selected detector (if_tail_hybrid 0.4.0: Isolation Forest + per-feature tail rule,
+input set v3) behind validated endpoints.
 Experimental analytics only: not a flight-safety, dispatch, or maintenance system.
 
 Run (from the repo root, conda env `environ`):
@@ -8,7 +9,8 @@ Run (from the repo root, conda env `environ`):
 Then open http://127.0.0.1:8000/docs
 
 Configuration (environment variables):
-    FLIGHTOPS_MODEL_PATH   model artifact (default: artifacts/models/isolation_forest_v<version>.joblib)
+    FLIGHTOPS_MODEL_PATH   model artifact (default: artifacts/models/if_tail_hybrid_v0.4.0.joblib;
+                           an isolation_forest artifact also works)
     FLIGHTOPS_MAX_BATCH    max windows per request (default 64)
     FLIGHTOPS_MAX_BODY_MB  max request body size in MB (default 16)
 """
@@ -74,6 +76,13 @@ class SupportingFeature(BaseModel):
     observed_value: float
     z_score_vs_nominal_training: float
     unit: str
+    tail_probability_vs_nominal: float | None = Field(
+        None, description="Share of nominal training windows at least this extreme (two-sided); hybrid model only")
+
+
+class ScoreComponents(BaseModel):
+    forest_percentile: float
+    tail_percentile: float
 
 
 class QualityFlags(BaseModel):
@@ -96,6 +105,7 @@ class AnomalyEvent(BaseModel):
     is_anomaly: bool
     supporting_features: list[SupportingFeature]
     quality_flags: QualityFlags
+    score_components: ScoreComponents | None = None
     interpretation: str
 
 

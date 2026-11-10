@@ -20,7 +20,8 @@ import torch
 from torch import nn
 
 MODEL_NAME = "conv_autoencoder"
-MODEL_VERSION = "0.2.0"  # 0.2.0: channel set v2 (no absolute heading/course inputs, + turn_rate)
+# 0.2.0: channel set v2 (no absolute heading/course inputs); 0.4.0: channel set v3 (relative offsets)
+MODEL_VERSION = "0.4.0"
 
 
 def resolve_device(device: str = "auto") -> torch.device:
@@ -172,6 +173,9 @@ class AEDetector:
         """Return (window score (n,), per-channel mean squared error (n, C)) in `idx` order."""
         if self.model is None:
             raise RuntimeError("Model is not fitted")
+        if self.mean is not None and channels.shape[2] != len(self.mean):
+            raise ValueError(f"Model expects {len(self.mean)} channels, got {channels.shape[2]} "
+                             "(trained on a different channel set)")
         idx = np.arange(channels.shape[0]) if idx is None else np.asarray(idx)
         dev = torch.device(self.device)
         self.model.eval()

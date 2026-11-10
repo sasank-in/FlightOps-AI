@@ -77,7 +77,8 @@ uvicorn app.main:app --app-dir services/inference-api --host 127.0.0.1 --port 80
 python services/inference-api/examples/demo_client.py --per-class 2                  # second terminal
 ```
 
-Serves Isolation Forest v2. See [services/inference-api/README.md](services/inference-api/README.md) and
+Serves `if_tail_hybrid` 0.4.0. Train it with `python -m flightops.models.train_hybrid`. See
+[services/inference-api/README.md](services/inference-api/README.md) and
 [docs/api-contracts.md](docs/api-contracts.md).
 
 ## Phase 3: autoencoder (CPU or cloud GPU)

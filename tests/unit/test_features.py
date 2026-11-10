@@ -23,7 +23,24 @@ def test_channel_layout_v2_excludes_absolute_directions():
     for name in ("true_heading", "selected_heading", "selected_course"):
         assert not any(c.startswith(name) for c in ch)
     assert "roll" in ch and "drift_angle" in ch and "altitude_rel_end" in ch
+    assert "flap_rel_end" in ch and "flap" not in ch
+    assert {"aileron_lh_rel_median", "aileron_rh_rel_median", "elevator_lh_rel_median", "rudder_rel_median",
+            "vert_accel_rel_median"} <= set(ch)
     assert len(feature_names()) == 17 * len(STATS)
+
+
+def test_per_aircraft_sensor_offsets_do_not_change_features():
+    # v3: a constant calibration offset on flap / elevator / ailerons / rudder (differs per aircraft)
+    # must not change any feature; real movement within the window still must.
+    X = _windows(2, 12)
+    X[1] = X[0]
+    for name, offset in (("flap", 95.0), ("elevator_lh", -42.0), ("aileron_lh", 5.3), ("aileron_rh", -3.1),
+                         ("rudder", 1.8), ("vert_accel", -0.12)):
+        X[1, :, IDX[name]] += offset
+    f = build_window_features(X)
+    np.testing.assert_allclose(f.iloc[0], f.iloc[1], rtol=1e-4, atol=1e-3)
+    X[1, 6:, IDX["flap"]] += 500.0                      # flaps actually move: must be visible
+    assert not np.allclose(build_window_features(X).iloc[1], f.iloc[0], atol=1e-3)
 
 
 def test_absolute_direction_does_not_change_features():
@@ -40,10 +57,11 @@ def test_altitude_relative_to_end_and_median_filter():
     X[0, :, IDX["altitude"]] = [500, 400, 300, 200, 100]
     X[0, :, IDX["vert_accel"]] = [1, 1, -4, 1, 1]
     ch = preprocess_batch(X)
+    va = channel_names().index("vert_accel_rel_median")
     np.testing.assert_allclose(ch[0, :, channel_names().index("altitude_rel_end")], [400, 300, 200, 100, 0])
-    np.testing.assert_allclose(ch[0, :, channel_names().index("vert_accel")], [1, 1, 1, 1, 1])
+    np.testing.assert_allclose(ch[0, :, va], [0, 0, 0, 0, 0])       # spike filtered, then median (1 g) removed
     raw = preprocess_batch(X, median_filter_vert_accel=False)
-    assert raw[0, 2, channel_names().index("vert_accel")] == -4
+    np.testing.assert_allclose(raw[0, :, va], [0, 0, -5, 0, 0])     # unfiltered: spike kept, relative to median
 
 
 def test_stats_values_for_linear_signal():

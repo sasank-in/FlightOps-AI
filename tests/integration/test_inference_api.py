@@ -12,8 +12,9 @@ pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
 from flightops.data.schema import FEATURE_NAMES, IDX  # noqa: E402
-from flightops.features.build_features import build_window_features, feature_names  # noqa: E402
+from flightops.features.build_features import base_variable, build_window_features, feature_names  # noqa: E402
 from flightops.inference.predict import N_TIMESTEPS, Predictor  # noqa: E402
+from flightops.models.hybrid import HybridDetector  # noqa: E402
 from flightops.models.isolation_forest import IForestDetector  # noqa: E402
 
 SERVICE_DIR = Path(__file__).resolve().parents[2] / "services" / "inference-api"
@@ -27,13 +28,16 @@ def _nominal_windows(n, seed=0):
     return X
 
 
-@pytest.fixture(scope="module")
-def model_path(tmp_path_factory):
-    X = _nominal_windows(300)
-    F = build_window_features(X)
-    det = IForestDetector(n_estimators=50).fit(F.to_numpy(), list(F.columns))
-    det.threshold = float(np.quantile(det.score(F.to_numpy()), 0.95))
-    return det.save(tmp_path_factory.mktemp("model") / "if.joblib")
+@pytest.fixture(scope="module", params=["forest", "hybrid"])
+def model_path(request, tmp_path_factory):
+    F = build_window_features(_nominal_windows(500)).to_numpy()
+    if request.param == "forest":
+        det = IForestDetector(n_estimators=50).fit(F, feature_names())
+        det.threshold = float(np.quantile(det.score(F), 0.95))
+    else:
+        det = HybridDetector(forest=IForestDetector(n_estimators=50)).fit(F[:400], feature_names())
+        det.calibrate(F[400:], target_fpr=0.05)
+    return det.save(tmp_path_factory.mktemp("model") / f"{request.param}.joblib")
 
 
 @pytest.fixture
@@ -58,15 +62,17 @@ def test_health_and_model_info(client):
     assert client.get("/health").json() == {"status": "ok", "model_loaded": True, "load_error": None}
     info = client.get("/v1/model").json()
     assert info["input"]["variables"] == FEATURE_NAMES and info["input"]["timesteps"] == 160
-    assert info["score_direction"] == "higher = more anomalous" and info["threshold"] > 0
+    assert info["score_direction"].startswith("higher = more anomalous") and info["threshold"] > 0
+    assert info["model_name"] in {"isolation_forest", "if_tail_hybrid"} and info["feature_set_version"] == "v3"
 
 
 def test_score_returns_contract_and_flags_outlier(client):
     X = _nominal_windows(2, seed=5)
     X[1, :, IDX["airspeed"]] += 80                     # strongly unusual approach
     X[1, :, IDX["airspeed"]] *= np.linspace(1, 3, N_TIMESTEPS)
-    for name in ("flap", "pitch", "core_speed", "glideslope_dev"):
+    for name in ("pitch", "core_speed", "glideslope_dev"):
         X[1, :, IDX[name]] += 25
+    X[1, :, IDX["flap"]] += np.linspace(-400, 0, N_TIMESTEPS)   # flaps moving late (relative change)
     r = client.post("/v1/score", json=_payload(X, ["normal-1", "odd-2"]), headers={"x-request-id": "abc123"})
     assert r.status_code == 200, r.text
     body = r.json()
@@ -76,8 +82,18 @@ def test_score_returns_contract_and_flags_outlier(client):
     assert set(e0) >= {"model_name", "model_version", "anomaly_score", "threshold", "is_anomaly",
                        "supporting_features", "quality_flags", "interpretation"}
     assert e1["anomaly_score"] > e0["anomaly_score"] and e1["is_anomaly"]
-    assert e1["supporting_features"][0]["feature"] in {"airspeed", "flap", "pitch", "core_speed", "glideslope_dev"}
+    top = e1["supporting_features"][0]
+    assert base_variable(top["feature"]) in {"airspeed", "flap", "pitch", "core_speed", "glideslope_dev"}
+    assert top["unit"] != ""                                    # units resolve for relative channels too
     assert len(e1["supporting_features"]) == 3
+    assert len({s["feature"] for s in e1["supporting_features"]}) == 3   # three distinct channels
+    if body["model_name"] == "if_tail_hybrid":
+        comps = e1["score_components"]
+        assert 0 <= comps["forest_percentile"] <= 1 and 0 <= comps["tail_percentile"] <= 1
+        assert all(0 < s["tail_probability_vs_nominal"] <= 1 for s in e1["supporting_features"])
+    else:
+        assert e1["score_components"] is None
+        assert all(s["tail_probability_vs_nominal"] is None for s in e1["supporting_features"])
 
 
 def test_scoring_is_deterministic(client):
@@ -138,3 +154,10 @@ def test_predictor_rejects_mismatched_feature_set(tmp_path):
     with pytest.raises(ValueError, match="different feature set"):
         Predictor.load(det.save(tmp_path / "old.joblib"))
     assert len(feature_names()) == 170
+
+
+def test_predictor_rejects_unknown_artifact(tmp_path):
+    import joblib
+    joblib.dump({"name": "something_else", "version": "1", "detector": object()}, tmp_path / "x.joblib")
+    with pytest.raises(ValueError, match="Unsupported model artifact"):
+        Predictor.load(tmp_path / "x.joblib")

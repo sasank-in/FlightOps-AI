@@ -215,6 +215,53 @@ present in training but unsafe for new aircraft, which a deployed model will mee
 relative to the window's own final or median value, as is already done for altitude, or normalise per
 aircraft using its nominal history. Then re-run the aircraft-held-out comparison.
 
+## Input set v3 (2026-11-10): per-aircraft sensor offsets removed. Served model: `if_tail_hybrid` 0.4.0
+
+**Diagnosis (nominal windows only, no anomaly labels):** offset ratio = spread of per-aircraft
+nominal medians divided by typical within-aircraft spread. Channels with ratio > 1:
+
+| Channel | Ratio | Evidence |
+|---------|------:|----------|
+| flap (final value) | 47.1 | per-aircraft full-flap count 3,586–3,745 |
+| elevator_lh | 4.6 | aircraft 655 reads −40.6° (sensor floor); fleet −4.2° |
+| aileron_lh / rh | 2.2 / 1.7 | 81–87 encoding offsets |
+| rudder | 1.4 | −2.0 to +1.7 |
+
+These are made relative to the window median (flap: relative to its window-end value, as altitude
+already was). A first v3 run still showed 15% false alarms in one aircraft-held-out fold, all from
+aircraft 685 (65% of its nominal windows) and 656. Aircraft 685's accelerometer reads 0.90 g in steady
+flight (fleet 0.99 g), so `vert_accel` (ratio 0.81) was also made relative to its window median.
+
+**Robustness fix:** caches are now keyed by a fingerprint of the feature definition and the input data.
+Previously a changed transformation with an unchanged array shape could silently reuse stale cached
+channels.
+
+**Decision rule, fixed before the final run:** serve the hybrid only if (a) its aircraft-held-out
+PR-AUC is ≥ the forest's, and (b) no fold's false-alarm rate exceeds 8%. Otherwise keep the forest.
+
+| Method (input set v3) | Validation PR-AUC | Test PR-AUC | Test precision / recall | Path High | Flaps Late | Speed High | Aircraft held out PR-AUC | Fold FPR range |
+|-----------------------|------------------:|------------:|------------------------:|----------:|-----------:|-----------:|-------------------------:|---------------:|
+| Isolation Forest (same fit) | 0.388 | 0.372 | 0.435 / 0.341 | 0.79 | 0.42 | 0.19 | 0.400 ± 0.025 | 0.045–0.053 |
+| Tail rule only | 0.396 | 0.391 | 0.436 / 0.364 | 0.60 | 0.99 | 0.21 | 0.372 ± 0.031 | 0.055–0.084 |
+| **Hybrid (selected)** | **0.420** | **0.410** | **0.468 / 0.391** | 0.70 | **0.97** | **0.22** | **0.402 ± 0.036** | 0.055–0.065 |
+
+The stand-alone Isolation Forest 0.4.0 (`train_baseline`, fit on all training nominal windows) gives
+test PR-AUC 0.367 and aircraft held out 0.402 ± 0.028, against v2's 0.352 and 0.385 ± 0.028.
+
+**Outcome:** both criteria pass, (a) 0.402 ≥ 0.400 and (b) maximum fold false-alarm rate 0.065, so
+**`if_tail_hybrid` 0.4.0 is the served model** (`artifacts/models/if_tail_hybrid_v0.4.0.joblib`).
+
+- **On aircraft seen in training:** clearly better. PR-AUC +0.038; Flaps Late detection 42% → 97%.
+- **On unseen aircraft:** equal to the forest.
+- **Known trade-offs:**
+  - Path High detection falls from 79% to 70%.
+  - On unseen aircraft the false-alarm rate is 5.5–6.5% against the 5% target, because the
+    threshold is calibrated on seen aircraft.
+- **Live check:** API scores equal offline scores (max difference 4×10⁻⁹).
+
+The autoencoder (0.4.0 label) has **not** been retrained on v3. Its v2 results above stand, and it is
+not served.
+
 ## Interpretation and next steps
 
 - The baseline is clearly better than random but weak for Speed High and Flaps Late.

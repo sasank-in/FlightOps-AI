@@ -15,10 +15,11 @@ threshold:
   target_fpr: 0.05
 
 autoencoder:
-  # 1D-conv sequence autoencoder on 18 preprocessed channels (set v2) x 160 s (flightops.models.autoencoder).
+  # 1D-conv sequence autoencoder on 17 preprocessed channels (set v3) x 160 s (flightops.models.autoencoder).
+  # Not served; last trained on set v2 (docs/evaluation-report.md).
   # Trained on the same nominal windows as the forest; early stopping on nominal validation loss.
   width: 64
-  latent_channels: 8      # bottleneck 8 x 20 = 160 values (18x compression)
+  latent_channels: 8      # bottleneck 8 x 20 = 160 values (17x compression)
   epochs: 60              # v1 was still improving at 30; early stopping (patience) ends sooner if it plateaus
   batch_size: 256
   lr: 0.001

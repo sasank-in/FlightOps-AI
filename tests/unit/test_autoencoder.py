@@ -46,6 +46,14 @@ def test_score_preserves_requested_order():
     np.testing.assert_allclose(det.score(data, idx)[0], det.score(data)[0][idx], rtol=1e-6)
 
 
+def test_score_rejects_different_channel_count():
+    data = _smooth_windows(20)
+    det = AEDetector(config=AEConfig(width=8, latent_channels=2, epochs=1, batch_size=16))
+    det.fit(data, np.arange(15), np.arange(15, 20), device="cpu", log=lambda *_: None)
+    with pytest.raises(ValueError, match="different channel set"):
+        det.score(_smooth_windows(5, C=5))
+
+
 def test_channel_cache(tmp_path):
     X = np.random.default_rng(0).normal(size=(6, 16, 20)).astype(np.float32)
     ch = load_or_build_channels(X, tmp_path, batch_size=4)
@@ -60,6 +68,23 @@ def test_channel_cache_rebuilds_when_stale(tmp_path):
     np.save(tmp_path / f"channels_{FEATURE_SET_VERSION}.npy", old)
     X = np.random.default_rng(0).normal(size=(6, 16, 20)).astype(np.float32)
     assert load_or_build_channels(X, tmp_path).shape == (6, 16, len(channel_names()))
+
+
+def test_channel_cache_rebuilds_on_definition_or_data_change(tmp_path, monkeypatch):
+    import flightops.features.build_features as bf
+    X = np.random.default_rng(0).normal(size=(6, 16, 20)).astype(np.float32)
+    first = np.array(load_or_build_channels(X, tmp_path))
+    # same shape, different transformation -> must rebuild, not reuse
+    monkeypatch.setattr(bf, "RELATIVE_TO_MEDIAN", tuple(n for n in bf.RELATIVE_TO_MEDIAN if n != "rudder"))
+    monkeypatch.setattr(bf, "channel_names", lambda: [c.replace("rudder_rel_median", "rudder") for c in channel_names()])
+    changed = np.array(bf.load_or_build_channels(X, tmp_path))
+    assert not np.allclose(first, changed)
+    monkeypatch.undo()
+    # same shape, different data -> must rebuild
+    X2 = X.copy(); X2[3] += 1.0
+    again = np.array(load_or_build_channels(X2, tmp_path))
+    np.testing.assert_allclose(again, np.array(load_or_build_channels(X2, tmp_path)))
+    assert not np.allclose(again, first)
 
 
 def test_download_validation(tmp_path):
