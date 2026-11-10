@@ -1,8 +1,15 @@
-"""Preprocessing and window-level features, following the Phase 1 decisions
-recorded in docs/dataset-card.md:
+"""Preprocessing and window-level features, following the decisions recorded in
+docs/dataset-card.md.
 
-- Circular angles (true heading, selected course/heading) are wrapped to [-180, 180)
-  and encoded as sin/cos channels. Raw angle values are never differenced.
+Channel set v2 (current):
+- Absolute heading/course channels (true heading, selected heading, selected course) are
+  NOT model inputs. They encode which runway is in use rather than how the approach is
+  flown, and selected course is faulty on aircraft 657 in 2001-2002. v1 encoded them as
+  sin/cos; models used them as a shortcut (docs/evaluation-report.md).
+- No heading-derived replacement: near ±180° the true-heading recording is corrupted (sign
+  flips such as -162, -185, -159, -208, -45, 208, 159), so a heading-based turn rate produced
+  impossible spikes (>30 deg/s in ~11% of windows) that dominated the autoencoder. Turning is
+  still represented by roll angle (turn rate follows from bank angle and speed) and drift angle.
 - Altitude is expressed relative to the window's last second (raw is barometric MSL).
 - Vertical acceleration optionally gets a 3-sample median filter (1-2 sample spikes).
 - Every other variable is used as recorded, including flap (raw counts) and ailerons.
@@ -19,24 +26,22 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from flightops.data.quality import wrap_degrees
 from flightops.data.schema import CIRCULAR_FEATURES, FEATURE_NAMES, IDX
 
-FEATURE_SET_VERSION = "v1"
+FEATURE_SET_VERSION = "v2"
 STATS: tuple[str, ...] = (
     "mean", "std", "min", "max", "median", "iqr", "first", "last", "slope", "mean_abs_diff",
 )
+# Absolute direction channels excluded from model inputs (v2). Kept in the data for quality checks.
+EXCLUDED_INPUTS: tuple[str, ...] = CIRCULAR_FEATURES
 
 
 def channel_names() -> list[str]:
     names: list[str] = []
     for name in FEATURE_NAMES:
-        if name in CIRCULAR_FEATURES:
-            names += [f"{name}_sin", f"{name}_cos"]
-        elif name == "altitude":
-            names.append("altitude_rel_end")
-        else:
-            names.append(name)
+        if name in EXCLUDED_INPUTS:
+            continue
+        names.append("altitude_rel_end" if name == "altitude" else name)
     return names
 
 
@@ -56,10 +61,9 @@ def preprocess_batch(batch: np.ndarray, median_filter_vert_accel: bool = True) -
     channels: list[np.ndarray] = []
     for name in FEATURE_NAMES:
         x = b[:, :, IDX[name]]
-        if name in CIRCULAR_FEATURES:
-            rad = np.deg2rad(wrap_degrees(x))
-            channels += [np.sin(rad), np.cos(rad)]
-        elif name == "altitude":
+        if name in EXCLUDED_INPUTS:
+            continue
+        if name == "altitude":
             channels.append(x - x[:, -1:])
         elif name == "vert_accel" and median_filter_vert_accel:
             channels.append(_median3(x))
@@ -127,6 +131,7 @@ def load_or_build_channels(
         arr = np.load(path, mmap_mode="r", allow_pickle=False)
         if arr.shape == shape:
             return arr
+        del arr  # release the mapping: Windows cannot replace a file that is still memory-mapped
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp.npy")
     out = np.lib.format.open_memmap(tmp, mode="w+", dtype=np.float32, shape=shape)

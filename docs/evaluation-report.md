@@ -114,6 +114,37 @@ Its only advantage comes from the aircraft-657 recording fault.
 direction and carry the 657 fault, and keep only relative ones such as turn rate and drift angle.
 Then retrain both models, ideally on a GPU with more epochs and aircraft-held-out folds.
 
+## Input set v2 (2026-11-10): absolute heading/course removed
+
+**Change:** true heading, selected heading and selected course are no longer model inputs, which leaves
+17 channels × 10 statistics = 170 forest features. Reasons:
+- they encode runway direction, not how the approach is flown;
+- selected course is faulty on aircraft 657;
+- true heading is corrupted near ±180°.
+
+A heading-derived turn rate was tried and rejected. The heading corruption produced impossible
+turn-rate spikes (>30°/s in ~11% of windows), which made up 87% of the autoencoder score on alerted
+windows. Turning is still represented by roll angle and drift angle. Model versions are now 0.2.0;
+v1 reports are archived in `artifacts/reports/v1/`.
+
+| Model (test split) | PR-AUC all | PR-AUC without 657 | Aircraft held out PR-AUC | Speed High | Path High | Flaps Late |
+|--------------------|-----------:|-------------------:|-------------------------:|-----------:|----------:|-----------:|
+| Isolation Forest v1 | 0.324 | 0.349 | 0.342 ± 0.021 | 0.142 | 0.755 | 0.343 |
+| **Isolation Forest v2** | **0.352** | **0.390** | **0.385 ± 0.028** | 0.168 | 0.758 | 0.392 |
+| Autoencoder v1 (30 epochs) | 0.279 | 0.192 | 0.229 ± 0.087 | 0.240* | 0.495 | 0.203 |
+| Autoencoder v2 (10-epoch CPU check) | 0.182 | 0.179 | not run | 0.072 | 0.378 | 0.238 |
+
+\* inflated by the aircraft-657 course fault.
+
+- **Isolation Forest v2:** better on every headline metric. Precision 0.414, recall 0.317 at the 5% budget.
+- **Autoencoder v2 (10-epoch check only):** loss matches v1 at the same epoch, and the error now
+  concentrates in physically meaningful channels:
+  - Path High: altitude profile 6.5×, localizer 4.4×, glideslope 3.6× nominal;
+  - Flaps Late: flap 47×;
+  - Speed High: altitude, flap, airspeed.
+- **Pending:** a full GPU run (up to 60 epochs with early stopping, plus aircraft-held-out folds) via
+  `notebooks/05_autoencoder_cloud_gpu.ipynb`.
+
 ## Interpretation and next steps
 
 - The baseline is clearly better than random but weak for Speed High and Flaps Late.

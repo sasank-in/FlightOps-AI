@@ -4,7 +4,7 @@ import pytest
 torch = pytest.importorskip("torch")
 
 from flightops.data.download import FILES, is_valid  # noqa: E402
-from flightops.features.build_features import channel_names, load_or_build_channels  # noqa: E402
+from flightops.features.build_features import FEATURE_SET_VERSION, channel_names, load_or_build_channels  # noqa: E402
 from flightops.models.autoencoder import AEConfig, AEDetector, ConvAutoencoder  # noqa: E402
 
 
@@ -51,6 +51,15 @@ def test_channel_cache(tmp_path):
     ch = load_or_build_channels(X, tmp_path, batch_size=4)
     assert ch.shape == (6, 16, len(channel_names())) and isinstance(ch, np.memmap)
     np.testing.assert_array_equal(load_or_build_channels(X, tmp_path), ch)
+    del ch
+
+
+def test_channel_cache_rebuilds_when_stale(tmp_path):
+    # A cache with a different shape (e.g. from an older channel set) must be replaced, also on Windows.
+    old = np.zeros((6, 16, 3), dtype=np.float32)
+    np.save(tmp_path / f"channels_{FEATURE_SET_VERSION}.npy", old)
+    X = np.random.default_rng(0).normal(size=(6, 16, 20)).astype(np.float32)
+    assert load_or_build_channels(X, tmp_path).shape == (6, 16, len(channel_names()))
 
 
 def test_download_validation(tmp_path):

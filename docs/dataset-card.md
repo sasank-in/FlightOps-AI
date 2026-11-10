@@ -105,7 +105,7 @@ these values have been removed or changed in the raw or processed data.
 |---|----------|---------|------------------|
 | 1 | Flap (8) | Raw position count, not degrees or detents: steps of ~110–125 while moving, final setting ~3,650–3,700. 43 windows have >1,000-count glitches | Continuous; derive time to reach ≥3,600; flag jumps |
 | 2 | Aileron LH/RH (0, 1) | Centred ~83–85, hard floor at 41.9, LH/RH correlation only 0.18. "Degree" does not match | Standardise only; low confidence in explanations; ask dataset owner |
-| 3 | True heading (17) | Degrees, but wrapping past ±180° is inconsistent (12.2% of windows reach ±290). Wrapping fixes all of them | Wrap to [-180, 180), then sin/cos; same for course and selected heading |
+| 3 | True heading (17) | Degrees, but near ±180° (southbound) the recording is **corrupted, not just unwrapped**: values flip sign and jump (e.g. −162, −185, −159, −208, −45, 208, 159). After wrapping, ~11% of windows still imply turn rates >30°/s, which is physically impossible | Don't use heading or heading-derived turn rate as model inputs (channel set v2). Use roll and drift angle for turning |
 | 4 | Total pressure (13) | 39 windows at 26–107 mbar for the whole window, **all from aircraft 684** (sensor fault) | Flag; exclude from nominal training |
 | 5 | Vertical accel (18) | 1–2-sample spikes outside [-1, 2.5] g in 10.7% of windows, similar rate in all classes | Robust statistics; optional median filter |
 | 6 | Altitude (3) | Barometric MSL. High values are high-elevation airports (KASE, KDEN, KSLC) | Use altitude relative to window end or airport |

@@ -16,7 +16,7 @@ from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import StandardScaler
 
 MODEL_NAME = "isolation_forest"
-MODEL_VERSION = "0.1.0"
+MODEL_VERSION = "0.2.0"  # 0.2.0: feature set v2 (no absolute heading/course inputs)
 
 
 @dataclass

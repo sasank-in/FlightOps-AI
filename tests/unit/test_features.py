@@ -2,6 +2,7 @@ import numpy as np
 
 from flightops.data.schema import IDX
 from flightops.features.build_features import (
+    FEATURE_SET_VERSION,
     STATS,
     build_window_features,
     channel_names,
@@ -16,20 +17,22 @@ def _windows(n=5, T=10):
     return rng.normal(size=(n, T, 20)).astype(np.float32)
 
 
-def test_channel_layout():
+def test_channel_layout_v2_excludes_absolute_directions():
     ch = channel_names()
-    assert len(ch) == 23  # 20 vars, 3 circular -> sin/cos
-    assert "true_heading_sin" in ch and "true_heading" not in ch and "altitude_rel_end" in ch
-    assert len(feature_names()) == 23 * len(STATS)
+    assert len(ch) == 17  # 20 vars - 3 absolute direction channels
+    for name in ("true_heading", "selected_heading", "selected_course"):
+        assert not any(c.startswith(name) for c in ch)
+    assert "roll" in ch and "drift_angle" in ch and "altitude_rel_end" in ch
+    assert len(feature_names()) == 17 * len(STATS)
 
 
-def test_heading_wrap_is_continuous():
-    X = _windows(1, 3)
-    X[0, :, IDX["true_heading"]] = [179.0, 181.0, -179.0]  # 181 is the same as -179
-    ch = preprocess_batch(X)
-    s = ch[0, :, channel_names().index("true_heading_sin")]
-    c = ch[0, :, channel_names().index("true_heading_cos")]
-    np.testing.assert_allclose([s[1], c[1]], [s[2], c[2]], atol=1e-6)
+def test_absolute_direction_does_not_change_features():
+    X = _windows(2, 10)
+    X[1] = X[0]
+    X[1, :, IDX["true_heading"]] += 90          # same manoeuvre, different runway
+    X[1, :, IDX["selected_course"]] += 123      # e.g. faulty course recording
+    f = build_window_features(X)
+    np.testing.assert_allclose(f.iloc[0], f.iloc[1], rtol=1e-4, atol=1e-4)  # float32 input rounding
 
 
 def test_altitude_relative_to_end_and_median_filter():
@@ -61,6 +64,6 @@ def test_batching_does_not_change_results():
 def test_feature_cache_round_trip(tmp_path):
     X = _windows(4, 10)
     first = load_or_build_features(X, tmp_path)
-    assert (tmp_path / "window_features_v1.npy").exists()
+    assert (tmp_path / f"window_features_{FEATURE_SET_VERSION}.npy").exists()
     second = load_or_build_features(X, tmp_path)
     np.testing.assert_array_equal(first.to_numpy(), second.to_numpy())

@@ -20,7 +20,7 @@ import torch
 from torch import nn
 
 MODEL_NAME = "conv_autoencoder"
-MODEL_VERSION = "0.1.0"
+MODEL_VERSION = "0.2.0"  # 0.2.0: channel set v2 (no absolute heading/course inputs, + turn_rate)
 
 
 def resolve_device(device: str = "auto") -> torch.device:
