@@ -20,6 +20,8 @@ dependencies = [
 # CPU: pip install torch --index-url https://download.pytorch.org/whl/cpu
 # GPU clouds (Colab/Kaggle) already ship a CUDA build of torch.
 dl = ["torch"]
+# Inference API (services/inference-api); httpx is needed for its tests.
+api = ["fastapi", "uvicorn[standard]", "httpx"]
 
 [project.scripts]
 flightops-inspect = "flightops.data.inspect:main"

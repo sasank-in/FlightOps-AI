@@ -9,10 +9,13 @@ backend and frontend integration\
 **Primary language:** Python 3.12.10\
 **Project type:** Applied ML / Aerospace Data Analytics / AI
 Engineering\
-**Status:** Phases 1--2 complete (2026-11-10). The dataset is verified, EDA
-is done, and the Isolation Forest baseline is evaluated (see
-`docs/dataset-card.md` and `docs/evaluation-report.md`). Phase 3
-(autoencoder and model comparison) is next.
+**Status (2026-11-10):** Phases 1--4 complete.
+- Data is verified (`docs/dataset-card.md`).
+- Isolation Forest v2 is the selected detector; the autoencoder was compared
+  (`docs/evaluation-report.md`).
+- The FastAPI inference service is running locally (`docs/api-contracts.md`).
+
+Phase 5 (application backend) is next.
 
 ------------------------------------------------------------------------
 
@@ -1362,15 +1365,16 @@ Do not commit:
 
 ### Phase 3 --- Advanced ML
 
--   [ ] Autoencoder implemented.
--   [ ] Temporal model evaluated if justified.
--   [ ] Models compared fairly.
--   [ ] Error analysis completed.
--   [ ] Model artifacts versioned.
+-   [x] Autoencoder implemented (1D-conv sequence autoencoder; trained on CPU and Kaggle T4).
+-   [ ] Temporal model evaluated if justified (LSTM autoencoder deferred: the conv autoencoder
+    did not beat the forest).
+-   [x] Models compared fairly (identical split fingerprint, threshold policy and aircraft folds).
+-   [x] Error analysis completed (aircraft-657 course fault, heading corruption, per-channel errors).
+-   [x] Model artifacts versioned (model 0.2.0, input set v2; v1 reports archived).
 
 ### Phase 4--8 --- Product delivery
 
--   [ ] Inference API tested.
+-   [x] Inference API tested (FastAPI, `services/inference-api`; API scores match offline evaluation).
 -   [ ] Backend integration tested.
 -   [ ] Dashboard usable.
 -   [ ] AI assistant grounded in analysis evidence.

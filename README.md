@@ -69,6 +69,17 @@ python -m flightops.models.train_baseline   # ~1 min: features, splits, Isolatio
 - [notebooks/04_baseline_anomaly_detection.ipynb](notebooks/04_baseline_anomaly_detection.ipynb): baseline results
 - [docs/evaluation-report.md](docs/evaluation-report.md): metrics, threshold policy, label concern
 
+## Phase 4: inference API
+
+```powershell
+python -m pip install -e ".[api]"
+uvicorn app.main:app --app-dir services/inference-api --host 127.0.0.1 --port 8000   # docs at /docs
+python services/inference-api/examples/demo_client.py --per-class 2                  # second terminal
+```
+
+Serves Isolation Forest v2. See [services/inference-api/README.md](services/inference-api/README.md) and
+[docs/api-contracts.md](docs/api-contracts.md).
+
 ## Phase 3: autoencoder (CPU or cloud GPU)
 
 ```powershell
