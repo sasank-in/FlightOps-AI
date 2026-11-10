@@ -77,14 +77,16 @@ python -m flightops.models.train_autoencoder                  # full run: ~15-20
 python -m flightops.models.train_autoencoder --aircraft-cv    # + 5 aircraft-held-out folds (GPU recommended)
 ```
 
-### Training on a cloud GPU (Colab or Kaggle)
+### Training on a cloud GPU (Kaggle or Colab)
 
-1. Package the code (no data, no secrets): `git archive --format=zip -o dist/flightops_src.zip HEAD`
-2. Open [notebooks/05_autoencoder_cloud_gpu.ipynb](notebooks/05_autoencoder_cloud_gpu.ipynb) in Colab
-   (*File → Upload notebook*) or Kaggle, and enable a GPU runtime.
-3. *Run all*. Upload `flightops_src.zip` when prompted, or set `CODE_SOURCE = "git"` if the branch is pushed
-   to a repo the runtime can reach. The notebook downloads and verifies the dataset itself (raw files are
-   cached in Google Drive on Colab).
+1. Make the code reachable, either way:
+   - **GitHub (default, `CODE_SOURCE = "git"`):** `git push`. The repo is public, so Kaggle clones it without a login.
+   - **Zip (`CODE_SOURCE = "zip"`):** `git archive --format=zip -o dist/flightops_src.zip HEAD`. On Kaggle,
+     upload it as a dataset (Kaggle extracts it, and the notebook finds the extracted folder).
+2. Import [notebooks/05_autoencoder_cloud_gpu.ipynb](notebooks/05_autoencoder_cloud_gpu.ipynb) (Kaggle: *File → Import
+   Notebook*). Enable GPU, and on Kaggle also turn **Internet on**.
+3. *Run All*. The notebook downloads and verifies the dataset itself. On Kaggle everything heavy stays in
+   `/tmp`, so only `flightops_results.zip` lands in `/kaggle/working`.
 4. Download `flightops_results.zip` and unzip it at the repo root. It contains only `artifacts/`.
 
 ## Tests
