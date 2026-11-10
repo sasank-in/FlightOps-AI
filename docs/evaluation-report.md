@@ -172,6 +172,49 @@ Threshold: same 5% nominal budget.
 - Speed High stays hard for both models (17% / 7%). Part of this class is the questionable aircraft-657
   labels, but Speed High on other aircraft is also detected poorly.
 
+## Hybrid detector experiment: Isolation Forest + per-feature tail rule (2026-11-10)
+
+`python -m flightops.models.train_hybrid`, model `if_tail_hybrid` 0.3.0, input set v2.
+
+**Idea:** the forest averages a single extreme signal away. For example, a Flaps Late window with flap
+z = −17 was not alerted. A plain "max |z|" rule failed because several features are heavy-tailed on
+nominal flights (localizer median reaches z ≈ 88 in 1% of nominal windows). Instead, each feature is
+judged by its two-sided **tail probability among nominal training windows**, and the score is the
+sum of the 3 largest −log10(tail). The hybrid alerts when either the forest or the tail score is
+unusual (max of the two nominal percentiles).
+
+**Protocol (no anomaly labels for fitting or calibration):**
+- fit: 85% of nominal training windows;
+- calibration (percentiles and 5% threshold): the other 15%;
+- method selection: validation PR-AUC;
+- test: scored once;
+- plus 5 aircraft-held-out folds.
+
+**Implementation bug found and fixed:** the first compact (quantile-grid) version mis-scored tied values.
+41% of nominal windows share one flap-IQR value, and that common value got *maximal* evidence;
+42 of 170 features were off by up to 4 orders of magnitude. The tie-aware lookup matches the exact
+empirical CDF within a factor of 2 at the extreme tail.
+
+| Method | Validation PR-AUC | Test PR-AUC | Test precision / recall | Test FPR | Flaps Late | Aircraft held out PR-AUC | Aircraft held out FPR |
+|--------|------------------:|------------:|------------------------:|---------:|-----------:|-------------------------:|----------------------:|
+| Forest (same fit) | 0.368 | 0.355 | 0.422 / 0.320 | 0.050 | 0.41 | **0.388 ± 0.029** | **0.049** (0.042–0.060) |
+| Tail only | 0.396 | 0.387 | 0.441 / 0.363 | 0.052 | 0.99 | 0.287 ± 0.092 | 0.061–0.311 |
+| Hybrid (selected on validation) | **0.410** | **0.401** | **0.462 / 0.386** | 0.051 | 0.97 | 0.312 ± 0.102 | 0.057–0.313 |
+
+**Why the hybrid does not transfer to unseen aircraft:** each aircraft's flap sensor settles at a
+slightly different raw count at full flaps (e.g. ~3,652 vs ~3,700). For nominal windows of unseen
+aircraft, the features most often in the tail top-3 are `flap.max`, `flap.last` and `flap.median`
+(then aileron level statistics, whose encoding is also aircraft-dependent). The tail rule flags these
+per-aircraft calibration offsets as extreme. In fold 2, 31% of nominal windows were alerted against
+a 5% budget. The forest weighs many features and is not affected.
+
+**Decision:** keep **Isolation Forest v2** as the served detector. The hybrid is better on aircraft
+present in training but unsafe for new aircraft, which a deployed model will meet.
+
+**Promising follow-up:** remove per-aircraft offsets before the tail rule. Express flap (and aileron)
+relative to the window's own final or median value, as is already done for altitude, or normalise per
+aircraft using its nominal history. Then re-run the aircraft-held-out comparison.
+
 ## Interpretation and next steps
 
 - The baseline is clearly better than random but weak for Speed High and Flaps Late.
