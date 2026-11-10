@@ -1,119 +1,165 @@
 # FlightOps AI
 
-Experimental flight telemetry analysis and anomaly detection. **Not** an aircraft
-control, maintenance, or certified flight-safety system.
+Experimental flight-telemetry analytics: anomaly detection on aircraft final-approach data, with a
+FastAPI scoring service.
 
-The full plan is in [documentation.md](documentation.md). The project is currently in **Phase 1
-(dataset acquisition and inspection)**.
+> **Not** an aircraft control, dispatch, maintenance or certified flight-safety system. Alerts are
+> statistical deviations from nominal approaches and need engineering review.
 
-## Setup: conda env `environ` (Windows, CPU PyTorch)
+The full project plan is in [documentation.md](documentation.md).
 
-The project runs in the existing conda env `environ` (Python 3.12, PyTorch CPU build):
+## Status
+
+| Phase | Scope | Status |
+|-------|-------|--------|
+| 1 | Dataset acquisition, verification, data quality, EDA | Done |
+| 2 | Feature engineering, splits, Isolation Forest baseline | Done |
+| 3 | Autoencoder and model comparison (CPU and Kaggle GPU) | Done |
+| 4 | FastAPI inference service | Done |
+| 5–8 | Application backend, dashboard, AI assistant, MLOps | Not started |
+
+## Results
+
+**Served model:** `if_tail_hybrid` **0.4.0**. It combines an Isolation Forest with a per-feature tail
+rule, on input set **v3**: 170 window features from 17 channels, with absolute heading/course removed
+and per-aircraft sensor offsets removed. Measured on the stratified test split, with the alert
+threshold set so that 5% of nominal approaches are flagged:
+
+| Model | PR-AUC | Precision | Recall | Flaps Late | Path High | Speed High | PR-AUC, aircraft held out |
+|-------|-------:|----------:|-------:|-----------:|----------:|-----------:|--------------------------:|
+| **if_tail_hybrid 0.4.0 (served)** | **0.410** | **0.468** | **0.391** | **97%** | 70% | 22% | **0.402 ± 0.036** |
+| Isolation Forest 0.4.0 | 0.367 | 0.423 | 0.331 | 39% | 77% | 19% | 0.402 ± 0.028 |
+| Conv autoencoder (input set v2) | 0.178 | 0.249 | 0.157 | 22% | 42% | 7% | 0.168 ± 0.017 |
+
+Random detection scores about 0.10 PR-AUC (anomaly prevalence). Full methodology, every experiment
+and the decision rules are in [docs/evaluation-report.md](docs/evaluation-report.md).
+
+**Key data findings** (details in [docs/dataset-card.md](docs/dataset-card.md)):
+
+- **Aircraft 657, 2001–2002:** the selected-course channel is faulty, and its Speed High labels look
+  questionable. Results are reported both with and without this aircraft.
+- **True heading near ±180° is corrupted**, so heading is not used as a model input.
+- **Per-aircraft sensor offsets** in flap, elevator (aircraft 655 reads −40°), ailerons, rudder and
+  vertical acceleration (aircraft 685 reads 0.90 g) are removed by making those signals relative.
+- **97 duplicate windows** are dropped before splitting.
+
+## Setup (Windows, conda env `environ`)
 
 ```powershell
-conda activate environ
-$env:PYTHONNOUSERSITE = "1"     # ignore packages in %APPDATA%\Python (a broken ipykernel lives there)
+conda activate environ                     # Python 3.12, PyTorch 2.13 CPU build
+cd C:\Users\shash\FlightOps-AI
 python -m pip install -r requirements.txt
-python -m pip install -e .
-# PyTorch CPU (already installed in environ):
-# python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+python -m pip install -e ".[api]"          # this package + FastAPI/uvicorn
 python -m ipykernel install --user --name flightops-ai --display-name "FlightOps AI (conda: environ)"
 ```
 
-The Jupyter kernel `flightops-ai` points at `environ` and sets `PYTHONNOUSERSITE=1` itself. The env also
-sets it on `conda activate`, via `conda env config vars set PYTHONNOUSERSITE=1 -n environ`, so the manual
-line above is only needed outside an activated env.
+- `environ` sets `PYTHONNOUSERSITE=1` on activation, and so does the `flightops-ai` Jupyter kernel.
+  This keeps a broken `ipykernel` in `%APPDATA%\Python` out of the env. Outside an activated env, run
+  `$env:PYTHONNOUSERSITE = "1"` first.
+- PyTorch is only needed for the autoencoder. CPU build:
+  `python -m pip install torch --index-url https://download.pytorch.org/whl/cpu`.
+- A plain venv also works (`py -3.12 -m venv .venv`, then the same commands). For WSL2/Linux, see
+  documentation.md §8.
 
-A plain venv also works (`py -3.12 -m venv .venv`, then the same pip commands). For WSL2/Linux,
-see section 8 of the documentation.
-
-## Getting the data
-
-```powershell
-python -m flightops.data.download   # official NASA URL, else the verified archive copy; SHA-256 checked
-```
-
-The dataset is never committed or re-hosted (licence listed as "N/A"; 1.7 GB).
-
-## Phase 1 workflow
-
-1. Download the dataset files from the official NASA DASHlink page into `data/raw/`.
-2. Inspect them (reads array headers only, safe for large files):
-
-   ```powershell
-   python -m flightops.data.inspect --json-out artifacts/reports/dataset_inspection.json
-   ```
-
-3. Record the source, checksums, and array keys in [docs/dataset-card.md](docs/dataset-card.md).
-4. Set `data_key`, `label_key`, `time_axis`, and `feature_axis` in [configs/data.yaml](configs/data.yaml).
-5. Fill in [docs/data-dictionary.md](docs/data-dictionary.md) from the official documentation.
-6. Build the memory-mappable float32 working copy (~45 s, low RAM use):
-
-   ```powershell
-   python -m flightops.data.processed
-   ```
-
-7. Run the notebooks with the **FlightOps AI (Python 3.12)** kernel:
-   - [notebooks/01_dataset_overview.ipynb](notebooks/01_dataset_overview.ipynb): class balance, aircraft, airports, per-class behaviour
-   - [notebooks/02_data_quality.ipynb](notebooks/02_data_quality.ipynb): integrity, duplicates, variable issues, quality flags
-
-Steps 1–7 are complete. The data is downloaded and verified, and the findings are in the dataset card.
-
-## Phase 2: baseline
+## Data
 
 ```powershell
-python -m flightops.models.train_baseline   # ~1 min: features, splits, Isolation Forest, evaluation
+python -m flightops.data.download     # NASA DASHlink URL, else verified Internet Archive copy; SHA-256 checked
+python -m flightops.data.inspect --json-out artifacts/reports/dataset_inspection.json
+python -m flightops.data.processed    # memory-mappable float32 working copy (~45 s, low RAM)
 ```
 
-- [notebooks/03_exploratory_analysis.ipynb](notebooks/03_exploratory_analysis.ipynb): variability, correlation, class separation, aircraft 657
-- [notebooks/04_baseline_anomaly_detection.ipynb](notebooks/04_baseline_anomaly_detection.ipynb): baseline results
-- [docs/evaluation-report.md](docs/evaluation-report.md): metrics, threshold policy, label concern
+- **Dataset:** NASA DASHlink *Curated 4 Class Anomaly Detection Data Set*. 99,837 windows × 160 s ×
+  20 variables, with labels Nominal / Speed High / Path High / Flaps Late Setting.
+- **Never committed or re-hosted:** the licence is listed as "N/A", and the files total 1.7 GB.
+- Provenance and checksums: [docs/dataset-card.md](docs/dataset-card.md). Variable definitions:
+  [docs/data-dictionary.md](docs/data-dictionary.md).
 
-## Phase 4: inference API
+## Train and evaluate
+
+All models share one split (recorded as a `split_fingerprint`) and use nominal-only calibration.
 
 ```powershell
-python -m pip install -e ".[api]"
-uvicorn app.main:app --app-dir services/inference-api --host 127.0.0.1 --port 8000   # docs at /docs
-python services/inference-api/examples/demo_client.py --per-class 2                  # second terminal
+python -m flightops.models.train_hybrid        # served model, ~2 min: forest vs tail vs hybrid + aircraft folds
+python -m flightops.models.train_baseline      # Isolation Forest alone, ~1 min
+python -m flightops.models.train_autoencoder --smoke          # 1-min pipeline check
+python -m flightops.models.train_autoencoder                  # full run, ~20 min CPU
+python -m flightops.models.train_autoencoder --aircraft-cv    # + 5 aircraft folds (GPU recommended)
 ```
 
-Serves `if_tail_hybrid` 0.4.0. Train it with `python -m flightops.models.train_hybrid`. See
-[services/inference-api/README.md](services/inference-api/README.md) and
-[docs/api-contracts.md](docs/api-contracts.md).
-
-## Phase 3: autoencoder (CPU or cloud GPU)
-
-```powershell
-python -m flightops.models.train_autoencoder --smoke          # 1-minute pipeline check
-python -m flightops.models.train_autoencoder                  # full run: ~15-20 min on CPU
-python -m flightops.models.train_autoencoder --aircraft-cv    # + 5 aircraft-held-out folds (GPU recommended)
-```
+Outputs go to `artifacts/models/` and `artifacts/reports/`. Both are git-ignored. Earlier input sets
+are archived in `artifacts/reports/v1/` and `v2/`.
 
 ### Training on a cloud GPU (Kaggle or Colab)
 
-1. Make the code reachable, either way:
-   - **GitHub (default, `CODE_SOURCE = "git"`):** `git push`. The repo is public, so Kaggle clones it without a login.
-   - **Zip (`CODE_SOURCE = "zip"`):** `git archive --format=zip -o dist/flightops_src.zip HEAD`. On Kaggle,
-     upload it as a dataset (Kaggle extracts it, and the notebook finds the extracted folder).
-2. Import [notebooks/05_autoencoder_cloud_gpu.ipynb](notebooks/05_autoencoder_cloud_gpu.ipynb) (Kaggle: *File → Import
-   Notebook*). Enable GPU, and on Kaggle also turn **Internet on**.
-3. *Run All*. The notebook downloads and verifies the dataset itself. On Kaggle everything heavy stays in
-   `/tmp`, so only `flightops_results.zip` lands in `/kaggle/working`.
-4. Download `flightops_results.zip` and unzip it at the repo root. It contains only `artifacts/`.
+1. Push the branch (`git push`). The repo is public, so the notebook clones it.
+   - Alternatively, set `CODE_SOURCE = "zip"` and upload `dist/flightops_src.zip`, built with
+     `git archive --format=zip -o dist/flightops_src.zip HEAD`.
+2. Import [notebooks/05_autoencoder_cloud_gpu.ipynb](notebooks/05_autoencoder_cloud_gpu.ipynb) and
+   enable a GPU. On Kaggle, also turn **Internet on**.
+3. Choose *Run All*. Step 3 prints the commit, input set and model versions: check they are current.
+   The notebook downloads and verifies the dataset itself.
+4. Download `flightops_results.zip` and extract it at the repo root
+   (`Expand-Archive -Force flightops_results.zip .`). It contains only `artifacts/`.
+
+## Inference API
+
+```powershell
+uvicorn app.main:app --app-dir services/inference-api --host 127.0.0.1 --port 8000
+# interactive docs: http://127.0.0.1:8000/docs
+python services/inference-api/examples/demo_client.py --per-class 2   # second terminal: real windows
+```
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/health` | Model loaded or not |
+| GET | `/v1/model` | Model version, threshold, input variables and units, evaluation summary |
+| POST | `/v1/score` | Score 1–64 windows → anomaly events (score, alert, top 3 unusual signals, quality flags) |
+
+Full contract: [docs/api-contracts.md](docs/api-contracts.md). Service details:
+[services/inference-api/README.md](services/inference-api/README.md).
+
+## Notebooks
+
+| Notebook | Content |
+|----------|---------|
+| [01_dataset_overview](notebooks/01_dataset_overview.ipynb) | Class balance, aircraft, airports, per-class behaviour |
+| [02_data_quality](notebooks/02_data_quality.ipynb) | Integrity, duplicates, variable issues, quality flags |
+| [03_exploratory_analysis](notebooks/03_exploratory_analysis.ipynb) | Variability, correlation, class separation, aircraft 657 (input set v1) |
+| [04_baseline_anomaly_detection](notebooks/04_baseline_anomaly_detection.ipynb) | First Isolation Forest results (input set v1) |
+| [05_autoencoder_cloud_gpu](notebooks/05_autoencoder_cloud_gpu.ipynb) | Kaggle/Colab/local training and model comparison |
+
+Notebooks 03–04 record the v1 analysis as it was run. Current results are in the evaluation report.
 
 ## Tests
 
 ```powershell
-pytest
+pytest            # 82 tests, synthetic data only (no dataset needed), ~20 s
 ```
 
-## Layout
+## Project layout
 
 ```text
-configs/            data and model configuration
-data/raw/           original downloads (not committed)
-docs/               dataset card, data dictionary
-src/flightops/      Python package (data loading, validation, inspection)
-tests/              unit tests (synthetic data only)
-artifacts/          generated models and reports (not committed)
+configs/                 data.yaml (verified dataset schema), model.yaml (splits, threshold, models)
+data/raw/, processed/    dataset files and derived caches (git-ignored)
+docs/                    dataset card, data dictionary, evaluation report, API contracts
+notebooks/               EDA, data quality, baseline, cloud GPU training
+services/inference-api/  FastAPI service, demo client
+src/flightops/
+  data/                  download, inspect, processed copy, quality flags, schema, splits
+  features/              preprocessing (input set v3) and window features, with fingerprinted caches
+  models/                isolation_forest, hybrid (served), autoencoder, training CLIs
+  evaluation/            metrics (alert-budget thresholds, PR-AUC, per-class rates)
+  inference/             model loading and scoring used by the API
+  pipeline.py            shared data/split/evaluation so models are compared on identical splits
+tests/unit/, integration/  unit tests and API tests
+artifacts/               trained models and reports (git-ignored)
 ```
+
+## Documentation
+
+- [documentation.md](documentation.md): project plan, phases and checklists
+- [docs/dataset-card.md](docs/dataset-card.md): source, checksums, data-quality findings
+- [docs/data-dictionary.md](docs/data-dictionary.md): variables, units, observed ranges
+- [docs/evaluation-report.md](docs/evaluation-report.md): all experiments, results and model decisions
+- [docs/api-contracts.md](docs/api-contracts.md): inference API request/response contract
