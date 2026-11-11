@@ -41,6 +41,17 @@ public final class StubInferenceServer {
         } catch (IOException e) {
             throw new IllegalStateException(e);
         }
+        server.createContext("/v1/model", exchange -> {
+            boolean fail = mode == Mode.HTTP_500;
+            byte[] body = (fail ? "{\"error\":\"boom\"}"
+                    : "{\"model_name\":\"stub_model\",\"model_version\":\"9.9.9\",\"threshold\":0.2,"
+                    + "\"evaluation\":{\"test_pr_auc\":0.41}}").getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(fail ? 500 : 200, body.length);
+            try (OutputStream os = exchange.getResponseBody()) {
+                os.write(body);
+            }
+        });
         server.createContext("/v1/score", exchange -> {
             calls.incrementAndGet();
             byte[] body;

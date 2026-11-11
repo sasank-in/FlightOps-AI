@@ -9,7 +9,7 @@ backend and frontend integration\
 **Primary language:** Python 3.12.10\
 **Project type:** Applied ML / Aerospace Data Analytics / AI
 Engineering\
-**Status (2026-11-11):** Phases 1--5 complete.
+**Status (2026-11-11):** Phases 1--6 complete.
 - Data is verified (`docs/dataset-card.md`).
 - The served detector is `if_tail_hybrid` 0.4.0 (Isolation Forest + per-feature tail rule, input
   set v3, per-aircraft sensor offsets removed); the autoencoder was compared
@@ -18,7 +18,9 @@ Engineering\
 - The Spring Boot application backend (auth, flights, analyses, audit; PostgreSQL) is in
   `services/application-backend`.
 
-Phase 6 (React dashboard) is next.
+- The React + TypeScript analyst dashboard is in `frontend/dashboard`.
+
+Phase 7 (AI engineering assistant) is next.
 
 ------------------------------------------------------------------------
 
@@ -1381,7 +1383,8 @@ Do not commit:
 -   [x] Inference API tested (FastAPI, `services/inference-api`; API scores match offline evaluation).
 -   [x] Backend integration tested (Spring Boot backend: 20 tests incl. full-stack tests on
     PostgreSQL; live end-to-end run with the real inference API matched offline scores).
--   [ ] Dashboard usable.
+-   [x] Dashboard usable (React dashboard: overview, flights, flight detail with evidence,
+    compare, model card, admin; light/dark; WCAG AA text contrast; visual QA in Edge).
 -   [ ] AI assistant grounded in analysis evidence.
 -   [ ] Containerized deployment works.
 -   [ ] Monitoring and documentation completed.

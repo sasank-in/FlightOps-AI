@@ -52,6 +52,7 @@ python services/application-backend/examples/e2e_demo.py --per-class 2
 | GET | `/analyses/{id}` | owner/admin | Status `PENDING` / `RUNNING` / `COMPLETED` / `FAILED`, model, metrics |
 | GET | `/flights/{id}/analyses` | owner/admin | All runs of a flight |
 | GET | `/flights/{id}/anomalies?analysisId=&onlyAboveThreshold=` | owner/admin | Scored windows of the latest (or given) completed run, with evidence |
+| GET | `/me`, `/model`, `/stats` | analyst/admin | Current user; model card (proxied from the inference API); dashboard statistics scoped to visible flights |
 | GET/POST | `/users`, PATCH `/users/{id}` | admin | List, create, enable or disable users |
 | GET | `/audit?limit=` | admin | Latest audit events |
 | GET | `/actuator/health` | anyone | Liveness and readiness |
@@ -86,7 +87,7 @@ retention job yet; use `DELETE /flights/{id}`. Report generation (documentation.
 
 ## Tests
 
-`mvn -B test` runs **20 tests**:
+`mvn -B test` runs **23 tests**:
 
 - **Unit tests:** DATABASE_URL parsing, the login limiter, safe failure messages, and a check that the
   20-variable list matches the Python schema.

@@ -23,6 +23,12 @@ mlruns/
 flightops_src*.zip
 flightops_results*.zip
 
+# Frontend
+node_modules/
+frontend/dashboard/dist/
+frontend/dashboard/screenshots/
+*.tsbuildinfo
+
 # Java / Maven build output
 target/
 *.class

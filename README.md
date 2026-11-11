@@ -1,7 +1,10 @@
 # FlightOps AI
 
 Experimental flight-telemetry analytics: anomaly detection on aircraft final-approach data, a FastAPI
-scoring service, and a Spring Boot application backend (auth, flights, analyses, audit).
+scoring service, a Spring Boot application backend (auth, flights, analyses, audit), and a React
+analyst dashboard.
+
+![FlightOps AI dashboard: flight detail](docs/images/dashboard-flight-detail.png)
 
 > **Not** an aircraft control, dispatch, maintenance or certified flight-safety system. Alerts are
 > statistical deviations from nominal approaches and need engineering review.
@@ -17,10 +20,11 @@ The full project plan is in [documentation.md](documentation.md).
 | 3 | Autoencoder and model comparison (CPU and Kaggle GPU) | Done |
 | 4 | FastAPI inference service | Done |
 | 5 | Spring Boot application backend + PostgreSQL | Done |
-| 6–8 | React dashboard, AI assistant, MLOps | Not started |
+| 6 | React + TypeScript analyst dashboard | Done |
+| 7–8 | AI engineering assistant, MLOps | Not started |
 
 ```text
-client ──JWT──> Spring Boot backend :8080 ──> FastAPI inference API :8000 ──> if_tail_hybrid 0.4.0
+React dashboard :5173 ──/api──> Spring Boot backend :8080 ──> FastAPI inference API :8000 ──> if_tail_hybrid 0.4.0
                      │ users, flights, telemetry, analyses, anomaly events, audit
                      └──> PostgreSQL (Flyway-managed schema)
 ```
@@ -148,6 +152,26 @@ What it provides:
 
 Details: [services/application-backend/README.md](services/application-backend/README.md).
 
+## Analyst dashboard (React)
+
+```powershell
+cd frontend\dashboard
+npm ci
+npm run dev            # http://127.0.0.1:5173, needs the backend (:8080) and inference API (:8000) running
+```
+
+Pages:
+- **Overview:** KPIs, alerts by flight, recent analyses.
+- **Flights:** list and upload.
+- **Flight detail:** anomaly timeline, per-window evidence, telemetry small multiples, run history.
+- **Compare flights.**
+- **Model card.**
+- **Admin:** users and audit log.
+
+The design is corporate, with light and dark themes. Chart colours are validated for colour-vision
+deficiency and every text colour meets WCAG AA contrast. Details:
+[frontend/dashboard/README.md](frontend/dashboard/README.md).
+
 ## Notebooks
 
 | Notebook | Content |
@@ -164,7 +188,8 @@ Notebooks 03–04 record the v1 analysis as it was run. Current results are in t
 
 ```powershell
 pytest                                           # Python: 84 tests, synthetic data only (no dataset needed), ~20 s
-cd services\application-backend; mvn -B test     # Java backend: 20 tests (unit + full-stack on PostgreSQL)
+cd services\application-backend; mvn -B test     # Java backend: 23 tests (unit + full-stack on PostgreSQL)
+cd frontend\dashboard; npm run typecheck; npm test   # dashboard: strict TypeScript + 13 tests
 ```
 
 `test_no_secrets.py` fails if a committed file contains an API key, token or database password.
@@ -179,6 +204,7 @@ docs/                    dataset card, data dictionary, evaluation report, API c
 notebooks/               EDA, data quality, baseline, cloud GPU training
 services/inference-api/  FastAPI service, demo client
 services/application-backend/  Spring Boot backend (Java 21): auth, flights, analyses, audit; Flyway SQL; e2e demo
+frontend/dashboard/      React + TypeScript dashboard (Vite): pages, charts, design system, tests, visual QA script
 src/flightops/
   data/                  download, inspect, processed copy, quality flags, schema, splits
   features/              preprocessing (input set v3) and window features, with fingerprinted caches

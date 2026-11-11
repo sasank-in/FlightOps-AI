@@ -189,6 +189,14 @@ by default. It returns `409` if the given run is not completed, and `404` if the
 `severityLabel` is only the position relative to the model threshold, **not a safety severity**.
 `evidence` is the inference API's per-window output, stored unchanged.
 
+### Dashboard support
+
+| Method | Path | Response |
+|--------|------|----------|
+| GET | `/me` | `{"id", "username", "role"}` |
+| GET | `/model` | The inference API's model card (`GET /v1/model`), passed through; `503` if the inference service is down |
+| GET | `/stats` | Statistics over the user's visible flights (admins: all). Counts: `flights`, `windows`, `analysesCompleted`, `analysesFailed`, `analysesInProgress`, `lastAnalysisAt`. Scores: `windowsScored` and `windowsAboveThreshold`, from each flight's **latest** completed run, so re-runs are not double-counted. Lists: `recentAnalyses` (latest 8) and `flightsByAlerts` (top 10) |
+
 ### Administration (ADMIN role)
 
 | Method | Path | Purpose |

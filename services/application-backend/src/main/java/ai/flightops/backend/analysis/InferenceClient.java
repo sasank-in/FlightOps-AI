@@ -54,6 +54,11 @@ public class InferenceClient {
         this.client = builder.baseUrl(cfg.baseUrl()).requestFactory(factory).build();
     }
 
+    /** Model card from the inference API ({@code GET /v1/model}): name, version, threshold, inputs, evaluation. */
+    public JsonNode modelInfo() {
+        return client.get().uri("/v1/model").accept(MediaType.APPLICATION_JSON).retrieve().body(JsonNode.class);
+    }
+
     public ScoreResponse score(List<ScoreWindow> windows) {
         return client.post()
                 .uri("/v1/score")
