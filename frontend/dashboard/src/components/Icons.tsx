@@ -53,3 +53,10 @@ export const IconX = (p: IconProps) => (<Icon {...p}><circle cx="12" cy="12" r="
 export const IconInfo = (p: IconProps) => (<Icon {...p}><circle cx="12" cy="12" r="9" /><path d="M12 11v5M12 8h.01" /></Icon>);
 export const IconChevron = (p: IconProps) => (<Icon {...p}><path d="m9 6 6 6-6 6" /></Icon>);
 export const IconShield = IconAudit;
+export const IconMenu = (p: IconProps) => (<Icon {...p}><path d="M4 6h16M4 12h16M4 18h16" /></Icon>);
+export const IconDownload = (p: IconProps) => (
+  <Icon {...p}><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5" /><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" /></Icon>
+);
+export const IconInbox = (p: IconProps) => (
+  <Icon {...p}><path d="M3 13h5l1.5 3h5L16 13h5" /><path d="M5.5 5h13L21 13v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6z" /></Icon>
+);

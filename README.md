@@ -189,7 +189,7 @@ Notebooks 03–04 record the v1 analysis as it was run. Current results are in t
 ```powershell
 pytest                                           # Python: 84 tests, synthetic data only (no dataset needed), ~20 s
 cd services\application-backend; mvn -B test     # Java backend: 23 tests (unit + full-stack on PostgreSQL)
-cd frontend\dashboard; npm run typecheck; npm test   # dashboard: strict TypeScript + 13 tests
+cd frontend\dashboard; npm run typecheck; npm test   # dashboard: strict TypeScript + 17 tests
 ```
 
 `test_no_secrets.py` fails if a committed file contains an API key, token or database password.
@@ -223,3 +223,4 @@ artifacts/               trained models and reports (git-ignored)
 - [docs/data-dictionary.md](docs/data-dictionary.md): variables, units, observed ranges
 - [docs/evaluation-report.md](docs/evaluation-report.md): all experiments, results and model decisions
 - [docs/api-contracts.md](docs/api-contracts.md): inference API and application backend contracts
+- [docs/design-audit.md](docs/design-audit.md): dashboard design audit (consistency, UI/UX, responsive, accessibility)

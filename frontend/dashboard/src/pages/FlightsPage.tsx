@@ -4,10 +4,11 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { endpoints } from "../api/endpoints";
 import type { UploadBody } from "../api/types";
-import { IconUpload } from "../components/Icons";
+import { IconDownload, IconUpload } from "../components/Icons";
+import { useToast } from "../components/toast";
 import { Card, Dialog, Empty, ErrorBanner, InfoBanner, Loading, Pager } from "../components/ui";
-import { formatDateTime } from "../lib/format";
-import { MAX_WINDOWS, TIMESTEPS, validateUpload } from "../lib/telemetry";
+import { formatClock, formatDateTime } from "../lib/format";
+import { MAX_WINDOWS, TIMESTEPS, uploadTemplate, validateUpload } from "../lib/telemetry";
 
 const PAGE_SIZE = 20;
 const MAX_FILE_BYTES = 32 * 1024 * 1024;
@@ -38,7 +39,7 @@ export function FlightsPage() {
           <p>Uploaded flights, each made of 160-second telemetry windows sampled at 1 Hz.</p>
         </div>
         <div className="page-actions">
-          <button className="btn btn-primary" onClick={() => setUpload(true)}><IconUpload size={15} />Upload flight</button>
+          <button className="btn btn-primary" onClick={() => setUpload(true)}><IconUpload size={16} />Upload flight</button>
         </div>
       </div>
 
@@ -46,8 +47,9 @@ export function FlightsPage() {
         {flights.isPending && <Loading />}
         {flights.isError && <div className="card-body"><ErrorBanner error={flights.error} /></div>}
         {flights.data && flights.data.items.length === 0 && (
-          <Empty title="No flights yet" action={<button className="btn btn-primary" onClick={() => setUpload(true)}>Upload a flight</button>}>
-            Upload telemetry as JSON to start analysing approaches.
+          <Empty title="No flights yet" icon={<IconUpload size={20} />}
+            action={<button className="btn btn-primary" onClick={() => setUpload(true)}><IconUpload size={16} />Upload a flight</button>}>
+            Upload approach telemetry as JSON (160-second windows of 20 signals) to start analysing.
           </Empty>
         )}
         {flights.data && flights.data.items.length > 0 && (
@@ -55,17 +57,17 @@ export function FlightsPage() {
             <div className="table-wrap">
               <table className="data">
                 <thead>
-                  <tr><th>Flight reference</th><th>Dataset</th><th className="right">Windows</th><th className="right">Duration</th><th>Uploaded</th><th className="right">ID</th></tr>
+                  <tr><th style={{ width: 72 }}>ID</th><th>Flight reference</th><th>Dataset</th><th className="right">Windows</th><th className="right">Duration</th><th>Uploaded</th></tr>
                 </thead>
                 <tbody>
                   {flights.data.items.map((f) => (
                     <tr key={f.id} className="clickable" onClick={() => navigate(`/flights/${f.id}`)}>
-                      <td><Link to={`/flights/${f.id}`} onClick={(e) => e.stopPropagation()}>{f.externalFlightReference}</Link></td>
+                      <td className="num muted">#{f.id}</td>
+                      <td><Link to={`/flights/${f.id}`} onClick={(e) => e.stopPropagation()} style={{ fontWeight: 500 }}>{f.externalFlightReference}</Link></td>
                       <td className="secondary">{f.datasetId ?? "—"}</td>
                       <td className="right">{f.nWindows}</td>
-                      <td className="right">{Math.round((f.nWindows * TIMESTEPS) / 60)} min</td>
+                      <td className="right">{formatClock(f.nWindows * TIMESTEPS)}</td>
                       <td className="secondary">{formatDateTime(f.createdAt)}</td>
-                      <td className="right muted">#{f.id}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -87,14 +89,26 @@ function UploadDialog({ onClose, onUploaded }: { onClose: () => void; onUploaded
   const [body, setBody] = useState<UploadBody | null>(null);
   const [problems, setProblems] = useState<string[]>([]);
 
+  const toast = useToast();
   const upload = useMutation({
     mutationFn: endpoints.upload,
     onSuccess: (flight) => {
+      toast(`Flight ${flight.externalFlightReference} uploaded (${flight.nWindows} windows)`);
       void queryClient.invalidateQueries({ queryKey: ["flights"] });
       void queryClient.invalidateQueries({ queryKey: ["stats"] });
       onUploaded(flight.id);
     },
   });
+
+  function downloadTemplate() {
+    const blob = new Blob([JSON.stringify(uploadTemplate(), null, 1)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "flightops-upload-template.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   async function onFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -122,6 +136,9 @@ function UploadDialog({ onClose, onUploaded }: { onClose: () => void; onUploaded
   return (
     <Dialog title="Upload flight" onClose={onClose} footer={
       <>
+        <button className="btn btn-ghost" style={{ marginRight: "auto" }} onClick={downloadTemplate}>
+          <IconDownload size={16} />Download template
+        </button>
         <button className="btn" onClick={onClose}>Cancel</button>
         <button className="btn btn-primary" disabled={!body || upload.isPending} onClick={() => body && upload.mutate(body)}>
           {upload.isPending ? "Uploading…" : "Upload"}
@@ -147,7 +164,7 @@ function UploadDialog({ onClose, onUploaded }: { onClose: () => void; onUploaded
         {body && (
           <InfoBanner>
             Ready to upload <strong>{body.externalFlightReference}</strong>: {body.windows.length} window
-            {body.windows.length === 1 ? "" : "s"} ({Math.round((body.windows.length * TIMESTEPS) / 60)} min of telemetry).
+            {body.windows.length === 1 ? "" : "s"} ({formatClock(body.windows.length * TIMESTEPS)} of telemetry).
           </InfoBanner>
         )}
         <ErrorBanner error={upload.error} />

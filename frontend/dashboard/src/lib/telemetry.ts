@@ -40,6 +40,32 @@ export const VARIABLE_INFO: Record<Variable, { label: string; unit: string }> = 
 
 export const DEFAULT_VARIABLES: Variable[] = ["airspeed", "altitude", "flap", "glideslope_dev"];
 
+/** Signals grouped the way an analyst reads an approach (used by pickers). */
+export const SIGNAL_GROUPS: { label: string; variables: Variable[] }[] = [
+  { label: "Speed & energy", variables: ["airspeed", "core_speed", "altitude", "vert_accel", "total_pressure", "wind_speed"] },
+  { label: "Flight path", variables: ["glideslope_dev", "localizer_dev", "aoa", "pitch", "roll", "drift_angle"] },
+  { label: "Configuration & controls", variables: ["flap", "elevator_lh", "aileron_lh", "aileron_rh", "rudder"] },
+  { label: "Heading & course", variables: ["true_heading", "selected_heading", "selected_course"] },
+];
+
+const STAT_LABELS: Record<string, string> = {
+  mean: "Mean", std: "Std. deviation", min: "Minimum", max: "Maximum", median: "Median", iqr: "Interquartile range",
+  first: "Value at start", last: "Value at end", slope: "Trend (slope)", mean_abs_diff: "Mean change per second",
+};
+
+/** Model channel ("flap_rel_end") -> readable signal name ("Trailing-edge flap", relative to window end). */
+export function signalLabel(channel: string): { label: string; qualifier: string | null } {
+  const base = channel.split("_rel_")[0] as Variable;
+  const label = VARIABLE_INFO[base]?.label ?? channel.replaceAll("_", " ");
+  const qualifier = channel.endsWith("_rel_end") ? "relative to window end"
+    : channel.endsWith("_rel_median") ? "relative to window median" : null;
+  return { label, qualifier };
+}
+
+export function statisticLabel(stat: string): string {
+  return STAT_LABELS[stat] ?? stat;
+}
+
 export const MAX_WINDOWS = 500;
 const REF_PATTERN = /^[A-Za-z0-9._:/-]{1,128}$/;
 
@@ -47,6 +73,16 @@ export interface ValidationResult {
   ok: boolean;
   errors: string[];
   body?: UploadBody;
+}
+
+/** A valid one-window upload file (all signals zero) for users to start from. */
+export function uploadTemplate(): UploadBody {
+  return {
+    externalFlightReference: "MY-FLIGHT-001",
+    datasetId: "my-dataset",
+    metadata: { note: "Replace the zero series with recorded telemetry (160 samples at 1 Hz per signal)." },
+    windows: [{ windowStartSeconds: 0, telemetry: Object.fromEntries(VARIABLES.map((v) => [v, Array(TIMESTEPS).fill(0)])) }],
+  };
 }
 
 /** Client-side mirror of the backend's upload validation, so problems are shown before sending. */
@@ -81,7 +117,12 @@ export function validateUpload(raw: unknown): ValidationResult {
       const missing = VARIABLES.filter((v) => !(v in tel));
       const unknown = Object.keys(tel).filter((k) => !(VARIABLES as readonly string[]).includes(k));
       if (missing.length || unknown.length) {
-        errors.push(`Window ${i}: missing ${missing.join(", ") || "none"}; unknown ${unknown.length}.`);
+        const list = (xs: string[]) => (xs.length > 3 ? `${xs.slice(0, 3).join(", ")} and ${xs.length - 3} more` : xs.join(", "));
+        const parts = [
+          missing.length ? `missing ${missing.length} of ${VARIABLES.length} signals (${list(missing)})` : "",
+          unknown.length ? `${unknown.length} unknown key${unknown.length === 1 ? "" : "s"} (${list(unknown)})` : "",
+        ].filter(Boolean);
+        errors.push(`Window ${i}: ${parts.join("; ")}.`);
         return;
       }
       for (const v of VARIABLES) {

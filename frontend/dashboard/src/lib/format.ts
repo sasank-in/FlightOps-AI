@@ -34,6 +34,15 @@ export function formatFeature(feature: string): string {
   return feature.replace("_rel_median", " (rel. median)").replace("_rel_end", " (rel. end)").replaceAll("_", " ");
 }
 
+/** Seconds into the flight -> "13:20" (m:ss) or "1:02:05" (h:mm:ss). */
+export function formatClock(totalSeconds: number): string {
+  const s = Math.max(0, Math.round(totalSeconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = String(s % 60).padStart(2, "0");
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
+}
+
 export function timeAgo(iso: string | null | undefined, now: Date = new Date()): string {
   if (!iso) return "—";
   const s = Math.round((now.getTime() - new Date(iso).getTime()) / 1000);

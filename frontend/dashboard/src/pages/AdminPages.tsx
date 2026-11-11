@@ -2,8 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 
 import { endpoints } from "../api/endpoints";
-import type { Role } from "../api/types";
-import { Badge, Card, ErrorBanner, Loading } from "../components/ui";
+import type { AuditEntry, Role } from "../api/types";
+import { useToast } from "../components/toast";
+import { Badge, Card, Empty, ErrorBanner, Loading, Segmented } from "../components/ui";
 import { useAuth } from "../lib/auth";
 import { formatDateTime } from "../lib/format";
 
@@ -15,9 +16,11 @@ export function UsersPage() {
   const [password, setPassword] = useState("");
   const [role, setRole] = useState<Role>("ANALYST");
 
+  const toast = useToast();
   const create = useMutation({
     mutationFn: () => endpoints.createUser(username.trim(), password, role),
-    onSuccess: () => {
+    onSuccess: (u) => {
+      toast(`Account ${u.username} created`);
       setUsername("");
       setPassword("");
       void queryClient.invalidateQueries({ queryKey: ["users"] });
@@ -25,7 +28,11 @@ export function UsersPage() {
   });
   const toggle = useMutation({
     mutationFn: ({ id, enabled }: { id: number; enabled: boolean }) => endpoints.setUserEnabled(id, enabled),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["users"] }),
+    onSuccess: (u) => {
+      toast(`Account ${u.username} ${u.enabled ? "enabled" : "disabled"}`);
+      void queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
+    onError: (e) => toast(e instanceof Error ? e.message : "Could not update the account", "error"),
   });
 
   function submit(e: FormEvent) {
@@ -70,7 +77,6 @@ export function UsersPage() {
               </table>
             </div>
           )}
-          {toggle.error && <div className="card-body"><ErrorBanner error={toggle.error} /></div>}
         </Card>
 
         <Card title="Create account" subtitle="Passwords need at least 12 characters">
@@ -94,7 +100,6 @@ export function UsersPage() {
               </select>
             </div>
             <ErrorBanner error={create.error} />
-            {create.isSuccess && <div className="banner banner-info" role="status">Account created.</div>}
             <button className="btn btn-primary" type="submit" disabled={create.isPending || username.trim().length < 3 || password.length < 12}>
               {create.isPending ? "Creating…" : "Create account"}
             </button>
@@ -105,8 +110,13 @@ export function UsersPage() {
   );
 }
 
+type OutcomeFilter = "ALL" | AuditEntry["outcome"];
+
 export function AuditPage() {
   const audit = useQuery({ queryKey: ["audit"], queryFn: () => endpoints.audit(200), refetchInterval: 30_000 });
+  const [outcome, setOutcome] = useState<OutcomeFilter>("ALL");
+  const rows = (audit.data ?? []).filter((e) => outcome === "ALL" || e.outcome === outcome);
+  const count = (o: OutcomeFilter) => (audit.data ?? []).filter((e) => o === "ALL" || e.outcome === o).length;
   return (
     <>
       <div className="page-head">
@@ -115,15 +125,24 @@ export function AuditPage() {
           <p>Sign-ins, uploads, analyses, account changes and denied access attempts (latest 200).</p>
         </div>
       </div>
-      <Card flush>
+      <Card flush title="Events" subtitle={audit.data ? `${rows.length} shown` : undefined}
+        actions={
+          <Segmented label="Filter by outcome" value={outcome} onChange={setOutcome} options={[
+            { value: "ALL", label: `All (${count("ALL")})` },
+            { value: "SUCCESS", label: `Success (${count("SUCCESS")})` },
+            { value: "DENIED", label: `Denied (${count("DENIED")})` },
+            { value: "FAILURE", label: `Failure (${count("FAILURE")})` },
+          ]} />
+        }>
         {audit.isPending && <Loading />}
         {audit.isError && <div className="card-body"><ErrorBanner error={audit.error} /></div>}
-        {audit.data && (
+        {audit.data && rows.length === 0 && <Empty title="No matching events" />}
+        {audit.data && rows.length > 0 && (
           <div className="table-wrap">
             <table className="data">
               <thead><tr><th>Time</th><th>User</th><th>Action</th><th>Entity</th><th>Outcome</th><th>Detail</th></tr></thead>
               <tbody>
-                {audit.data.map((e) => (
+                {rows.map((e) => (
                   <tr key={e.id}>
                     <td className="secondary num">{formatDateTime(e.at)}</td>
                     <td>{e.username ?? "—"}</td>

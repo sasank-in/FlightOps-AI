@@ -1,8 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { endpoints } from "../api/endpoints";
-import { Card, ErrorBanner, InfoBanner, Loading, StatTile } from "../components/ui";
+import { Badge, Card, ErrorBanner, InfoBanner, Loading, StatTile } from "../components/ui";
 import { formatDateTime, formatScore } from "../lib/format";
+import { VARIABLE_INFO, type Variable } from "../lib/telemetry";
 
 export function ModelPage() {
   const model = useQuery({ queryKey: ["model"], queryFn: endpoints.model, staleTime: 300_000, retry: false });
@@ -27,7 +28,7 @@ export function ModelPage() {
         <StatTile label="Recall at threshold" value={formatScore(ev.test_recall)} note="Share of labelled anomalies alerted" />
       </div>
 
-      <div className="grid grid-main-side mt-16">
+      <div className="grid grid-main-side equal mt-16">
         <Card title="Model" subtitle="Identity and decision rule">
           <dl className="kv">
             <dt>Name</dt><dd>{m.model_name}</dd>
@@ -53,14 +54,25 @@ export function ModelPage() {
 
       {m.input && (
         <div className="mt-16">
-          <Card title="Input signals" subtitle="Raw telemetry expected for every 160-second window" flush>
+          <Card title="Input signals" subtitle="Raw telemetry expected for every 160-second window. Heading and course are excluded from the model (runway direction, recording faults) but used for data-quality flags." flush>
             <div className="table-wrap">
               <table className="data">
-                <thead><tr><th style={{ width: 56 }}>#</th><th style={{ width: "35%" }}>Signal</th><th>Unit</th></tr></thead>
+                <thead><tr><th style={{ width: 56 }}>#</th><th>Signal</th><th>Field name</th><th>Unit</th><th>Used as model input</th></tr></thead>
                 <tbody>
-                  {m.input.variables.map((v, i) => (
-                    <tr key={v}><td className="num muted">{i + 1}</td><td className="mono">{v}</td><td className="secondary">{m.input?.units[v] ?? "—"}</td></tr>
-                  ))}
+                  {m.input.variables.map((v, i) => {
+                    const excluded = v === "true_heading" || v === "selected_heading" || v === "selected_course";
+                    return (
+                      <tr key={v}>
+                        <td className="num muted">{i + 1}</td>
+                        <td style={{ fontWeight: 500 }}>{VARIABLE_INFO[v as Variable]?.label ?? v}</td>
+                        <td className="mono secondary">{v}</td>
+                        <td className="secondary">{m.input?.units[v] ?? "—"}</td>
+                        <td>{excluded
+                          ? <Badge>Quality checks only</Badge>
+                          : <Badge tone="good">Yes</Badge>}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

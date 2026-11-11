@@ -3,8 +3,10 @@ import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ApiError, api, setToken, setUnauthorizedHandler } from "../api/client";
-import { formatCount, formatFeature, formatPercent, formatProbability, formatScore } from "../lib/format";
-import { TIMESTEPS, VARIABLES, validateUpload } from "../lib/telemetry";
+import { formatClock, formatCount, formatFeature, formatPercent, formatProbability, formatScore } from "../lib/format";
+import {
+  SIGNAL_GROUPS, TIMESTEPS, VARIABLES, signalLabel, statisticLabel, uploadTemplate, validateUpload,
+} from "../lib/telemetry";
 
 function telemetry(fill = 1): Record<string, number[]> {
   return Object.fromEntries(VARIABLES.map((v) => [v, Array.from({ length: TIMESTEPS }, () => fill)]));
@@ -29,7 +31,10 @@ describe("telemetry contract", () => {
     const missing = telemetry();
     delete missing.flap;
     expect(validateUpload({ externalFlightReference: "F", windows: [{ windowStartSeconds: 0, telemetry: missing }] }).errors[0])
-      .toContain("missing flap");
+      .toContain("missing 1 of 20 signals (flap)");
+    const many = validateUpload({ externalFlightReference: "F", windows: [{ windowStartSeconds: 0, telemetry: { flap: [] } }] }).errors[0];
+    expect(many).toContain("missing 19 of 20 signals");
+    expect(many).toContain("and 16 more");                     // long lists are summarised, not dumped
     const short = telemetry();
     short.airspeed = [1, 2, 3];
     expect(validateUpload({ externalFlightReference: "F", windows: [{ windowStartSeconds: 0, telemetry: short }] }).errors[0])
@@ -40,6 +45,31 @@ describe("telemetry contract", () => {
       .toContain("'pitch' has a missing or non-finite value at second 7");
     expect(validateUpload([1, 2]).ok).toBe(false);
     expect(validateUpload({ externalFlightReference: "F", windows: [{ windowStartSeconds: -1, telemetry: telemetry() }] }).ok).toBe(false);
+  });
+});
+
+describe("readable names and templates", () => {
+  it("turns model channels and statistics into analyst-facing labels", () => {
+    expect(signalLabel("flap_rel_end")).toEqual({ label: "Trailing-edge flap", qualifier: "relative to window end" });
+    expect(signalLabel("aileron_rh_rel_median")).toEqual({ label: "Aileron position (RH)", qualifier: "relative to window median" });
+    expect(signalLabel("airspeed")).toEqual({ label: "Computed airspeed", qualifier: null });
+    expect(statisticLabel("iqr")).toBe("Interquartile range");
+    expect(statisticLabel("mean_abs_diff")).toBe("Mean change per second");
+  });
+
+  it("groups every signal exactly once", () => {
+    const grouped = SIGNAL_GROUPS.flatMap((g) => g.variables);
+    expect([...grouped].sort()).toEqual([...VARIABLES].sort());
+  });
+
+  it("offers a template that passes validation", () => {
+    expect(validateUpload(uploadTemplate()).ok).toBe(true);
+  });
+
+  it("formats time in flight as a clock", () => {
+    expect(formatClock(0)).toBe("0:00");
+    expect(formatClock(800)).toBe("13:20");
+    expect(formatClock(3725)).toBe("1:02:05");
   });
 });
 

@@ -58,6 +58,8 @@ backend that is not on `127.0.0.1:8080`.
 - **Text contrast:** every text/background pair meets **WCAG AA (≥ 4.5:1)**. The values were computed,
   not eyeballed: links 6.6:1 light / 8.3:1 dark, muted text ≥ 4.8:1.
 
+Design audit and changes: [docs/design-audit.md](../../docs/design-audit.md).
+
 ## Security
 
 - **Session:** the token is kept in `sessionStorage` (cleared when the tab closes) and in memory, and is
@@ -73,8 +75,9 @@ backend that is not on `127.0.0.1:8080`.
 
 ```powershell
 npm run typecheck      # strict TypeScript (incl. noUncheckedIndexedAccess), tests included
-npm test               # 13 tests
+npm test               # 17 tests
 npm run screenshots    # visual QA in the installed Microsoft Edge; fails on console errors or failed requests
+node scripts/audit-capture.mjs   # responsive (1024 / 390 px), empty states, focus, validation; fails on mobile overflow
 ```
 
 The tests cover:

@@ -137,14 +137,14 @@ export function ScoreTimeline({ events, threshold, selected, onSelect }: {
   const yMin = Math.min(0, ...data.map((d) => d.score));
   const ticks = Array.from({ length: 5 }, (_, i) => Number((yMin + ((yMax - yMin) * i) / 4).toFixed(3)));
   return (
-    <div>
+    <div className="chart-fill">
       <div className="chart-legend" aria-hidden="true">
         <span className="legend-key"><span className="legend-swatch" style={{ background: colors.series1 }} />Below threshold</span>
         <span className="legend-key"><span className="legend-swatch" style={{ background: colors.critical }} />Above threshold (alert)</span>
         <span className="legend-key"><span className="legend-line" style={{ background: colors.ink }} />Threshold {formatScore(threshold)}</span>
       </div>
       <div className="chart" role="img" aria-label={`Anomaly score for ${events.length} windows; threshold ${formatScore(threshold)}`}>
-        <ResponsiveContainer width="100%" height={320}>
+        <ResponsiveContainer width="100%" height={280}>
           <BarChart data={data} margin={{ top: 8, right: 12, bottom: 4, left: 0 }} barCategoryGap="22%"
             onClick={(state: { activeLabel?: string | number }) => {
               if (onSelect && state?.activeLabel !== undefined) onSelect(Number(state.activeLabel));
@@ -184,10 +184,10 @@ export function ScoreTimeline({ events, threshold, selected, onSelect }: {
 export function AlertsByFlight({ items, onSelect }: { items: FlightAlertSummary[]; onSelect?: (flightId: number) => void }) {
   const { colors } = useTheme();
   const data = items.map((i) => ({ id: i.flightId, name: i.externalFlightReference, above: i.nAboveThreshold, n: i.nWindows }));
-  const height = Math.max(120, data.length * 34 + 40);
+  const height = Math.max(200, data.length * 34 + 40);
   return (
     <div className="chart" role="img" aria-label="Windows above threshold by flight">
-      <ResponsiveContainer width="100%" height={height}>
+      <ResponsiveContainer width="100%" height="100%" minHeight={height}>
         <BarChart data={data} layout="vertical" margin={{ top: 4, right: 40, bottom: 4, left: 0 }} barCategoryGap="30%"
           onClick={(state: { activeIndex?: number | string | null }) => {
             const i = state?.activeIndex;

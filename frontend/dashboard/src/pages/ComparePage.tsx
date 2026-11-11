@@ -7,9 +7,11 @@ import { endpoints } from "../api/endpoints";
 import type { Anomalies } from "../api/types";
 import { ChartCard } from "../components/ChartCard";
 import { CompareLines } from "../components/charts";
+import { IconCompare, IconUpload } from "../components/Icons";
 import { Card, Empty, ErrorBanner, Loading, ThresholdBadge } from "../components/ui";
-import { formatScore } from "../lib/format";
-import { VARIABLE_INFO, VARIABLES, type Variable } from "../lib/telemetry";
+import { formatClock, formatScore } from "../lib/format";
+import { useTheme } from "../lib/theme";
+import { SIGNAL_GROUPS, VARIABLE_INFO, type Variable } from "../lib/telemetry";
 
 interface Side { flightId: number | null; window: number }
 
@@ -48,11 +50,30 @@ export function ComparePage() {
 
   const sa = useSide(a);
   const sb = useSide(b);
+  const { colors } = useTheme();
 
-  if (flights.isPending) return <Loading />;
-  if (flights.isError) return <ErrorBanner error={flights.error} />;
+  const head = (
+    <div className="page-head">
+      <div>
+        <h1>Compare flights</h1>
+        <p>Overlay one signal from two windows on a common time axis, alongside their anomaly scores.</p>
+      </div>
+    </div>
+  );
+  if (flights.isPending) return <>{head}<Loading /></>;
+  if (flights.isError) return <>{head}<ErrorBanner error={flights.error} /></>;
   if (flights.data.items.length === 0) {
-    return <Card><Empty title="No flights to compare" action={<Link className="btn btn-primary" to="/flights?upload=1">Upload a flight</Link>} /></Card>;
+    return (
+      <>
+        {head}
+        <Card>
+          <Empty title="No flights to compare" icon={<IconCompare size={20} />}
+            action={<Link className="btn btn-primary" to="/flights?upload=1"><IconUpload size={16} />Upload a flight</Link>}>
+            Upload at least one flight. You can compare two windows of the same flight or of different flights.
+          </Empty>
+        </Card>
+      </>
+    );
   }
 
   const info = VARIABLE_INFO[variable];
@@ -60,15 +81,23 @@ export function ComparePage() {
   const va = sa.telemetry.data?.telemetry[variable];
   const vb = sb.telemetry.data?.telemetry[variable];
 
-  const sidePicker = (label: string, side: Side, set: (s: Side) => void, d: typeof sa) => (
-    <div className="row" style={{ flexWrap: "wrap" }}>
-      <span className="secondary" style={{ fontWeight: 600, minWidth: 16 }}>{label}</span>
-      <select className="select" aria-label={`Flight ${label}`} value={side.flightId ?? ""} onChange={(e) => set({ flightId: Number(e.target.value), window: 0 })}>
-        {flights.data.items.map((f) => <option key={f.id} value={f.id}>{f.externalFlightReference}</option>)}
-      </select>
-      <select className="select" aria-label={`Window ${label}`} value={side.window} onChange={(e) => set({ ...side, window: Number(e.target.value) })}>
-        {(d.detail.data?.windows ?? [{ windowIndex: 0 }]).map((w) => <option key={w.windowIndex} value={w.windowIndex}>Window {w.windowIndex}</option>)}
-      </select>
+  const sidePicker = (label: string, side: Side, set: (s: Side) => void, d: typeof sa, color: string) => (
+    <div className="series-group" role="group" aria-labelledby={`series-${label}`}>
+      <div className="series-head" id={`series-${label}`}>
+        <span className="legend-line" style={{ background: color }} aria-hidden="true" />Series {label}
+      </div>
+      <div className="field-pair">
+        <select className="select" aria-label={`Series ${label} flight`} value={side.flightId ?? ""}
+          onChange={(e) => set({ flightId: Number(e.target.value), window: 0 })}>
+          {flights.data.items.map((f) => <option key={f.id} value={f.id}>{f.externalFlightReference}</option>)}
+        </select>
+        <select className="select" aria-label={`Series ${label} window`} value={side.window}
+          onChange={(e) => set({ ...side, window: Number(e.target.value) })}>
+          {(d.detail.data?.windows ?? [{ windowIndex: 0, windowStartSeconds: 0 }]).map((w) => (
+            <option key={w.windowIndex} value={w.windowIndex}>Window {w.windowIndex} · {formatClock(w.windowStartSeconds)}</option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 
@@ -76,29 +105,25 @@ export function ComparePage() {
 
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h1>Compare flights</h1>
-          <p>Overlay one signal from two windows on a common time axis, alongside their anomaly scores.</p>
-        </div>
-      </div>
-
+      {head}
       <div className="stack">
         <ChartCard
           title={`${info.label} (${info.unit})`}
           subtitle="Seconds into each 160-second window"
           controls={
-            <div className="stack" style={{ gap: 10 }}>
-              <div className="grid grid-2" style={{ gap: 10 }}>
-                {sidePicker("A", a, setA, sa)}
-                {sidePicker("B", b, setB, sb)}
-              </div>
-              <div className="row">
-                <label htmlFor="cmp-var" className="secondary" style={{ fontSize: 12.5 }}>Signal</label>
+            <div className="compare-toolbar">
+              <div className="series-group">
+                <label className="series-head" htmlFor="cmp-var">Signal</label>
                 <select id="cmp-var" className="select" value={variable} onChange={(e) => setVariable(e.target.value as Variable)}>
-                  {VARIABLES.map((v) => <option key={v} value={v}>{VARIABLE_INFO[v].label}</option>)}
+                  {SIGNAL_GROUPS.map((g) => (
+                    <optgroup key={g.label} label={g.label}>
+                      {g.variables.map((v) => <option key={v} value={v}>{VARIABLE_INFO[v].label}</option>)}
+                    </optgroup>
+                  ))}
                 </select>
               </div>
+              {sidePicker("A", a, setA, sa, colors.series1)}
+              {sidePicker("B", b, setB, sb, colors.series2)}
             </div>
           }
           chart={(sa.telemetry.isPending || sb.telemetry.isPending) ? <Loading /> :
@@ -122,6 +147,7 @@ export function ComparePage() {
         />
 
         <Card title="Anomaly scores" subtitle="Latest completed analysis of each flight" flush>
+          <div className="table-wrap">
           <table className="data">
             <thead><tr><th>Series</th><th>Flight · window</th><th className="right">Score</th><th className="right">Threshold</th><th>Status</th></tr></thead>
             <tbody>
@@ -129,7 +155,11 @@ export function ComparePage() {
                 const e = scoreOf(side, d);
                 return (
                   <tr key={label}>
-                    <td style={{ fontWeight: 600 }}>{label}</td>
+                    <td style={{ fontWeight: 600 }}>
+                      <span className="legend-key">
+                        <span className="legend-line" style={{ background: label === "A" ? colors.series1 : colors.series2 }} aria-hidden="true" />{label}
+                      </span>
+                    </td>
                     <td>{side.flightId !== null ? <Link to={`/flights/${side.flightId}`}>{name(side, d)}</Link> : "—"}</td>
                     <td className="right">{e ? formatScore(e.anomalyScore) : "—"}</td>
                     <td className="right">{e ? formatScore(e.threshold) : "—"}</td>
@@ -139,6 +169,7 @@ export function ComparePage() {
               })}
             </tbody>
           </table>
+          </div>
         </Card>
       </div>
     </>

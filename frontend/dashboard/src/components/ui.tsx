@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { AnalysisStatus } from "../api/types";
 import { ApiError } from "../api/client";
-import { IconAlert, IconCheck, IconClock, IconInfo, IconX } from "./Icons";
+import { IconAlert, IconCheck, IconClock, IconInbox, IconInfo, IconX } from "./Icons";
 
 export function Card({ title, subtitle, actions, children, footer, flush, className }: {
   title?: ReactNode; subtitle?: ReactNode; actions?: ReactNode; children: ReactNode;
@@ -75,9 +75,10 @@ export function InfoBanner({ children, tone = "info" }: { children: ReactNode; t
   return <div className={`banner banner-${tone}`}><IconInfo size={16} /><span>{children}</span></div>;
 }
 
-export function Empty({ title, children, action }: { title: string; children?: ReactNode; action?: ReactNode }) {
+export function Empty({ title, children, action, icon }: { title: string; children?: ReactNode; action?: ReactNode; icon?: ReactNode }) {
   return (
     <div className="empty">
+      <div className="empty-icon" aria-hidden="true">{icon ?? <IconInbox size={20} />}</div>
       <h3>{title}</h3>
       {children && <p>{children}</p>}
       {action && <div className="mt-16">{action}</div>}
@@ -148,8 +149,9 @@ export function ConfirmButton({ label, confirmLabel, onConfirm, disabled, icon }
     return () => window.clearTimeout(t);
   }, [armed]);
   return (
-    <button className="btn btn-danger" disabled={disabled}
-      onClick={() => (armed ? (setArmed(false), onConfirm()) : setArmed(true))}>
+    <button className={`btn btn-danger ${armed ? "armed" : ""}`} disabled={disabled} aria-live="polite"
+      onClick={() => (armed ? (setArmed(false), onConfirm()) : setArmed(true))}
+      onBlur={() => setArmed(false)}>
       {icon}{armed ? confirmLabel : label}
     </button>
   );

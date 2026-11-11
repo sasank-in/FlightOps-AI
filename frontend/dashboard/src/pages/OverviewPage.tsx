@@ -26,7 +26,7 @@ export function OverviewPage() {
           <p>Fleet-level summary of uploaded flights and the latest analysis of each.</p>
         </div>
         <div className="page-actions">
-          <Link className="btn btn-primary" to="/flights?upload=1"><IconUpload size={15} />Upload flight</Link>
+          <Link className="btn btn-primary" to="/flights?upload=1"><IconUpload size={16} />Upload flight</Link>
         </div>
       </div>
 
@@ -36,16 +36,22 @@ export function OverviewPage() {
           note="Latest completed analysis per flight" />
         <StatTile label="Above threshold" value={formatCount(s.windowsAboveThreshold)}
           note={alertRate === null ? "No analyses yet" : `${formatPercent(alertRate)} of analysed windows`} />
-        <StatTile label="Analyses" value={formatCount(s.analysesCompleted)}
-          note={`${s.analysesInProgress} in progress · ${s.analysesFailed} failed · last ${timeAgo(s.lastAnalysisAt)}`} />
+        <StatTile label="Analyses completed" value={formatCount(s.analysesCompleted)}
+          note={s.lastAnalysisAt
+            ? `${s.analysesInProgress} in progress · ${s.analysesFailed} failed · last ${timeAgo(s.lastAnalysisAt)}`
+            : "No analyses run yet"} />
       </div>
 
-      <div className="grid grid-main-side mt-16">
+      <div className="grid grid-main-side equal mt-16">
         <ChartCard
+          fill
           title="Windows above threshold by flight"
           subtitle="Latest completed analysis per flight · top 10 · select a bar to open the flight"
           chart={s.flightsByAlerts.length === 0
-            ? <Empty title="No analyses yet">Run an analysis on a flight to see results here.</Empty>
+            ? <Empty title="No analysed flights yet"
+                action={<Link className="btn" to={s.flights ? "/flights" : "/flights?upload=1"}>{s.flights ? "Open flights" : "Upload a flight"}</Link>}>
+                {s.flights ? "Open a flight and run an analysis to see alerts here." : "Upload a flight, then run an analysis to see alerts here."}
+              </Empty>
             : <AlertsByFlight items={s.flightsByAlerts} onSelect={(id) => navigate(`/flights/${id}`)} />}
           table={
             <table className="data">
@@ -77,14 +83,14 @@ export function OverviewPage() {
               <dt>Unseen aircraft PR-AUC</dt><dd className="num">{formatScore(model.data.evaluation?.aircraft_held_out_pr_auc_mean)}</dd>
             </dl>
           )}
-          <div className="mt-16"><Link to="/model">View model card →</Link></div>
+          <div className="mt-16"><Link to="/model">View model card</Link></div>
         </Card>
       </div>
 
       <div className="mt-16">
         <Card title="Recent analyses" subtitle="Most recent analysis runs across your flights" flush>
           {s.recentAnalyses.length === 0 ? (
-            <Empty title="No analyses yet">Open a flight and select “Run analysis”.</Empty>
+            <Empty title="No analyses yet">Analysis runs appear here as soon as one is started.</Empty>
           ) : (
             <div className="table-wrap">
               <table className="data">
