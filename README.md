@@ -1,7 +1,7 @@
 # FlightOps AI
 
-Experimental flight-telemetry analytics: anomaly detection on aircraft final-approach data, with a
-FastAPI scoring service.
+Experimental flight-telemetry analytics: anomaly detection on aircraft final-approach data, a FastAPI
+scoring service, and a Spring Boot application backend (auth, flights, analyses, audit).
 
 > **Not** an aircraft control, dispatch, maintenance or certified flight-safety system. Alerts are
 > statistical deviations from nominal approaches and need engineering review.
@@ -16,7 +16,14 @@ The full project plan is in [documentation.md](documentation.md).
 | 2 | Feature engineering, splits, Isolation Forest baseline | Done |
 | 3 | Autoencoder and model comparison (CPU and Kaggle GPU) | Done |
 | 4 | FastAPI inference service | Done |
-| 5–8 | Application backend, dashboard, AI assistant, MLOps | Not started |
+| 5 | Spring Boot application backend + PostgreSQL | Done |
+| 6–8 | React dashboard, AI assistant, MLOps | Not started |
+
+```text
+client ──JWT──> Spring Boot backend :8080 ──> FastAPI inference API :8000 ──> if_tail_hybrid 0.4.0
+                     │ users, flights, telemetry, analyses, anomaly events, audit
+                     └──> PostgreSQL (Flyway-managed schema)
+```
 
 ## Results
 
@@ -119,6 +126,28 @@ python services/inference-api/examples/demo_client.py --per-class 2   # second t
 Full contract: [docs/api-contracts.md](docs/api-contracts.md). Service details:
 [services/inference-api/README.md](services/inference-api/README.md).
 
+## Application backend (Spring Boot)
+
+Requires Java 21, Maven, PostgreSQL with a `flightops` database, and these values in the repo-root
+`.env` (template: [.env.example](.env.example)): `DATABASE_URL`, `FLIGHTOPS_JWT_SECRET`,
+`FLIGHTOPS_ADMIN_PASSWORD`.
+
+```powershell
+cd services\application-backend
+mvn -B package                                   # 20 tests (uses a separate flightops_test DB)
+java -jar target\application-backend-0.1.0.jar   # http://127.0.0.1:8080, needs the inference API running
+# second terminal, repo root, conda activate environ:
+python services/application-backend/examples/e2e_demo.py --per-class 2   # upload -> analysis -> anomalies
+```
+
+What it provides:
+- **Login:** JWT login with roles (`ANALYST`, `ADMIN`).
+- **Flights and telemetry:** upload, list and view; analysts only see their own flights.
+- **Analyses:** asynchronous runs that call the inference API, with stored anomaly events.
+- **User management and an audit trail.**
+
+Details: [services/application-backend/README.md](services/application-backend/README.md).
+
 ## Notebooks
 
 | Notebook | Content |
@@ -134,8 +163,12 @@ Notebooks 03–04 record the v1 analysis as it was run. Current results are in t
 ## Tests
 
 ```powershell
-pytest            # 82 tests, synthetic data only (no dataset needed), ~20 s
+pytest                                           # Python: 84 tests, synthetic data only (no dataset needed), ~20 s
+cd services\application-backend; mvn -B test     # Java backend: 20 tests (unit + full-stack on PostgreSQL)
 ```
+
+`test_no_secrets.py` fails if a committed file contains an API key, token or database password.
+Real values belong only in the git-ignored `.env`.
 
 ## Project layout
 
@@ -145,6 +178,7 @@ data/raw/, processed/    dataset files and derived caches (git-ignored)
 docs/                    dataset card, data dictionary, evaluation report, API contracts
 notebooks/               EDA, data quality, baseline, cloud GPU training
 services/inference-api/  FastAPI service, demo client
+services/application-backend/  Spring Boot backend (Java 21): auth, flights, analyses, audit; Flyway SQL; e2e demo
 src/flightops/
   data/                  download, inspect, processed copy, quality flags, schema, splits
   features/              preprocessing (input set v3) and window features, with fingerprinted caches
@@ -162,4 +196,4 @@ artifacts/               trained models and reports (git-ignored)
 - [docs/dataset-card.md](docs/dataset-card.md): source, checksums, data-quality findings
 - [docs/data-dictionary.md](docs/data-dictionary.md): variables, units, observed ranges
 - [docs/evaluation-report.md](docs/evaluation-report.md): all experiments, results and model decisions
-- [docs/api-contracts.md](docs/api-contracts.md): inference API request/response contract
+- [docs/api-contracts.md](docs/api-contracts.md): inference API and application backend contracts

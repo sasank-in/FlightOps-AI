@@ -1,0 +1,62 @@
+# FlightOps AI application backend. Secrets come from environment variables or the repo-root .env
+# (git-ignored), never from this file.
+spring:
+  application:
+    name: flightops-backend
+  config:
+    # .env uses KEY=VALUE lines, which Spring can read as a properties file.
+    import: "optional:file:./.env[.properties],optional:file:../../.env[.properties]"
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate          # schema is owned by Flyway migrations
+  flyway:
+    enabled: true
+  mvc:
+    problemdetails:
+      enabled: true
+  threads:
+    virtual:
+      enabled: false
+
+server:
+  port: ${FLIGHTOPS_BACKEND_PORT:8080}
+  error:
+    include-message: never
+    include-stacktrace: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+flightops:
+  database:
+    # DATABASE_URL (postgresql://user:password@host:port/db) from .env; name-override lets tests
+    # point at a separate database on the same server.
+    url: ${DATABASE_URL:}
+    name-override: ${FLIGHTOPS_DATABASE_NAME:}
+  security:
+    jwt-secret: ${FLIGHTOPS_JWT_SECRET:}
+    token-ttl: PT1H
+    max-failed-logins: 5
+    lockout: PT15M
+  bootstrap:
+    admin-username: ${FLIGHTOPS_ADMIN_USERNAME:admin}
+    admin-password: ${FLIGHTOPS_ADMIN_PASSWORD:}
+  inference:
+    base-url: ${FLIGHTOPS_INFERENCE_URL:http://127.0.0.1:8000}
+    batch-size: 64
+    connect-timeout: PT5S
+    read-timeout: PT60S
+  upload:
+    max-windows: 500
+    max-body-bytes: 33554432      # 32 MB
+  analysis:
+    max-starts-per-minute: 30
+    worker-threads: 2
+    queue-capacity: 100

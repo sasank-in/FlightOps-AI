@@ -107,5 +107,102 @@ and the evaluation summary read from the matching report.
 ### `GET /health`
 `{"status": "ok", "model_loaded": true, "load_error": null}` (200), or `degraded` (503) with the load error.
 
-## Application backend (Phase 5, proposed)
-See documentation.md §17. Not implemented yet.
+## Application backend (Phase 5, implemented)
+
+Service: `services/application-backend` (Spring Boot 4, Java 21, PostgreSQL). Base URL when running
+locally: `http://127.0.0.1:8080`. All endpoints are under `/api/v1` and require
+`Authorization: Bearer <token>`, except login. Errors are RFC 9457 problem JSON
+(`{"title", "status", "detail"}`; validation errors add `errors: [{field, message}]`). Request values
+are never echoed.
+
+### Authentication
+
+`POST /api/v1/auth/login` `{"username": "...", "password": "..."}`
+→ `200 {"access_token": "<JWT>", "token_type": "Bearer", "expires_in": 3600}`
+
+- `401`: invalid credentials (identical for an unknown user and a wrong password).
+- `429`: locked for 15 minutes after 5 consecutive failures.
+- The token carries `sub` (username) and `roles` (`ANALYST` or `ADMIN`), issuer `flightops-backend`,
+  HS256. The user is re-checked on every request, so a disabled user is refused immediately.
+
+### Flights
+
+`POST /api/v1/flights/upload` → `201` + `Location`
+
+```json
+{
+  "externalFlightReference": "DASHLINK-DEMO-1",
+  "datasetId": "dashlink-4class",
+  "metadata": {"any": "JSON object, max 16 KB"},
+  "windows": [
+    {"windowStartSeconds": 0, "telemetry": {"aileron_lh": [160 numbers], "...": "all 20 variables"}}
+  ]
+}
+```
+
+| Rule | Limit |
+|------|-------|
+| Windows | 1–500 (`flightops.upload.max-windows`) |
+| Telemetry | Exactly the 20 variables of the inference API, 160 finite numbers each |
+| `externalFlightReference` | `[A-Za-z0-9._:/-]{1,128}` |
+| Body | ≤ 32 MB, with `Content-Length` |
+
+Response: `{"id", "externalFlightReference", "datasetId", "nWindows", "ownerId", "createdAt"}`.
+
+| Method | Path | Response |
+|--------|------|----------|
+| GET | `/flights?page=0&size=20` | `{"items": [flight...], "page", "size", "totalItems", "totalPages"}`. Own flights; admins see all |
+| GET | `/flights/{id}` | `{"flight": {...}, "metadata": {...}, "windows": [{"windowIndex", "windowStartSeconds", "windowEndSeconds"}]}` |
+| GET | `/flights/{id}/telemetry?window=k` | `{"flightId", "windowIndex", "windowStartSeconds", "windowEndSeconds", "telemetry": {20 variables}}` |
+| DELETE | `/flights/{id}` | `204`. Windows, analyses and events are deleted too |
+
+A flight owned by another analyst returns `404`, not `403`, so its existence is not revealed.
+
+### Analyses (asynchronous)
+
+`POST /api/v1/flights/{id}/analyses` → `202` + `Location: /api/v1/analyses/{runId}`. Poll
+`GET /api/v1/analyses/{runId}`:
+
+```json
+{"id": 1, "flightId": 1, "status": "COMPLETED", "modelName": "if_tail_hybrid", "modelVersion": "0.4.0",
+ "threshold": 0.9713, "startedAt": "...", "completedAt": "...",
+ "metrics": {"n_windows": 8, "n_above_threshold": 3, "max_score": 0.9938, "mean_score": 0.687},
+ "error": null}
+```
+
+- **Status:** `PENDING` → `RUNNING` → `COMPLETED` | `FAILED`.
+- **`error`:** a safe summary only, e.g. "Inference service unavailable or timed out".
+- **`429`:** more than 30 starts per user per minute.
+
+`GET /api/v1/flights/{id}/anomalies?analysisId=&onlyAboveThreshold=false` uses the latest completed run
+by default. It returns `409` if the given run is not completed, and `404` if there is none:
+
+```json
+{"flightId": 1, "analysisId": 1, "modelName": "if_tail_hybrid", "modelVersion": "0.4.0", "threshold": 0.9713,
+ "nWindows": 8, "nAboveThreshold": 3,
+ "events": [{"windowIndex": 6, "windowStartSeconds": 960, "windowEndSeconds": 1119, "anomalyScore": 0.9929,
+             "threshold": 0.9713, "isAnomaly": true, "severityLabel": "ABOVE_THRESHOLD",
+             "evidence": {"supporting_features": [...], "quality_flags": {...}, "score_components": {...},
+                          "interpretation": "..."}}]}
+```
+
+`severityLabel` is only the position relative to the model threshold, **not a safety severity**.
+`evidence` is the inference API's per-window output, stored unchanged.
+
+### Administration (ADMIN role)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/users` | List users (no password hashes) |
+| POST | `/users` | `{"username": "[A-Za-z0-9._-]{3,64}", "password": "≥12 chars", "role": "ANALYST" or "ADMIN"}` → `201`; `409` if the user exists |
+| PATCH | `/users/{id}` | `{"enabled": false}` disables a user immediately (an admin cannot disable themselves) |
+| GET | `/audit?limit=100` | `[{"id", "at", "username", "action", "entityType", "entityId", "outcome", "detail"}]` |
+
+Audited actions: `LOGIN`, `USER_CREATE`, `USER_ENABLE`/`USER_DISABLE`, `FLIGHT_UPLOAD`, `FLIGHT_ACCESS`
+(denied), `FLIGHT_DELETE`, `ANALYSIS_START`, `ANALYSIS_ACCESS` (denied). Outcomes are `SUCCESS`,
+`DENIED` and `FAILURE`. Details never contain passwords, tokens or telemetry.
+
+### Not yet implemented
+
+`POST /api/v1/reports` and `GET /api/v1/reports/{id}` (documentation.md §17) depend on the AI assistant
+and are planned for Phase 7.

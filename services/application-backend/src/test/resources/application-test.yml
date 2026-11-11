@@ -1,0 +1,23 @@
+# Test profile: a separate database on the same server (DATABASE_URL from the repo-root .env),
+# fixed test secrets, and small limits so limit behaviour can be tested quickly.
+flightops:
+  database:
+    name-override: flightops_test
+  security:
+    jwt-secret: test-only-secret-0123456789-abcdefghijklmnop
+    max-failed-logins: 3
+  bootstrap:
+    admin-username: admin
+    admin-password: test-admin-password-123
+  upload:
+    max-windows: 5
+    max-body-bytes: 2000000
+  analysis:
+    max-starts-per-minute: 1000
+  inference:
+    read-timeout: PT10S
+
+logging:
+  level:
+    root: WARN
+    ai.flightops: INFO

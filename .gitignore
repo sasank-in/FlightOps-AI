@@ -23,6 +23,10 @@ mlruns/
 flightops_src*.zip
 flightops_results*.zip
 
+# Java / Maven build output
+target/
+*.class
+
 # Editors / OS
 .vscode/
 .idea/

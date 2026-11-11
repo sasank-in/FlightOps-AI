@@ -13,8 +13,11 @@ PATTERNS = {
     "Anthropic key": re.compile(r"sk-ant-[A-Za-z0-9_-]{20,}"),
     "GitHub token": re.compile(r"gh[pousr]_[A-Za-z0-9]{30,}"),
     "AWS access key": re.compile(r"AKIA[0-9A-Z]{16}"),
-    "DB URL with password": re.compile(r"postgres(?:ql)?://[^:\s/]+:(?!PASSWORD@)[^@\s]+@"),
+    # the literal placeholder "password" (any case) is allowed, e.g. postgresql://user:password@host/db
+    "DB URL with password": re.compile(r"postgres(?:ql)?://[^:\s/\"']+:(?!(?i:password)@)[^@\s\"']+@"),
 }
+# Deliberate fake values in tests must be marked on the same line with this comment.
+ALLOW_MARKER = "secret-scan: allow"
 
 
 def _tracked_text_files():
@@ -35,6 +38,8 @@ def test_env_is_git_ignored():
 
 
 def test_no_credentials_in_tracked_files():
-    hits = [f"{name}: {label}" for name, text in _tracked_text_files()
-            for label, rx in PATTERNS.items() if rx.search(text)]
+    hits = [f"{name}:{lineno}: {label}"
+            for name, text in _tracked_text_files()
+            for lineno, line in enumerate(text.splitlines(), start=1) if ALLOW_MARKER not in line
+            for label, rx in PATTERNS.items() if rx.search(line)]
     assert not hits, "Possible secrets in tracked files (move them to .env): " + "; ".join(hits)

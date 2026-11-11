@@ -9,14 +9,16 @@ backend and frontend integration\
 **Primary language:** Python 3.12.10\
 **Project type:** Applied ML / Aerospace Data Analytics / AI
 Engineering\
-**Status (2026-11-10):** Phases 1--4 complete.
+**Status (2026-11-11):** Phases 1--5 complete.
 - Data is verified (`docs/dataset-card.md`).
 - The served detector is `if_tail_hybrid` 0.4.0 (Isolation Forest + per-feature tail rule, input
   set v3, per-aircraft sensor offsets removed); the autoencoder was compared
   (`docs/evaluation-report.md`).
 - The FastAPI inference service is running locally (`docs/api-contracts.md`).
+- The Spring Boot application backend (auth, flights, analyses, audit; PostgreSQL) is in
+  `services/application-backend`.
 
-Phase 5 (application backend) is next.
+Phase 6 (React dashboard) is next.
 
 ------------------------------------------------------------------------
 
@@ -1377,7 +1379,8 @@ Do not commit:
 ### Phase 4--8 --- Product delivery
 
 -   [x] Inference API tested (FastAPI, `services/inference-api`; API scores match offline evaluation).
--   [ ] Backend integration tested.
+-   [x] Backend integration tested (Spring Boot backend: 20 tests incl. full-stack tests on
+    PostgreSQL; live end-to-end run with the real inference API matched offline scores).
 -   [ ] Dashboard usable.
 -   [ ] AI assistant grounded in analysis evidence.
 -   [ ] Containerized deployment works.
