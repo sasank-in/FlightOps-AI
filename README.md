@@ -29,6 +29,27 @@ React dashboard :5173 ──/api──> Spring Boot backend :8080 ──> FastAP
                      └──> PostgreSQL (Flyway-managed schema)
 ```
 
+## Quick start (Windows)
+
+Once setup is done (conda env `environ`, PostgreSQL, `.env` from `.env.example`, trained model; see
+below):
+
+```bat
+start.bat              :: inference API (:8000) + backend (:8080), each in its own window
+start.bat dashboard    :: ...and the dashboard (http://127.0.0.1:5173)
+start.bat build        :: rebuild the backend jar first
+stop.bat               :: stop only the FlightOps processes
+```
+
+`start.bat` checks prerequisites:
+
+- `.env`, the conda env's Python, Java, the model artifact;
+- that the ports are free (a second run refuses instead of starting duplicates);
+- that the backend jar exists (built with Maven if missing).
+
+It waits until each service reports healthy before starting the next. `stop.bat` matches FlightOps
+processes by their exact command line, so other Java/Python/Node programs are never affected.
+
 ## Results
 
 **Served model:** `if_tail_hybrid` **0.4.0**. It combines an Isolation Forest with a per-feature tail

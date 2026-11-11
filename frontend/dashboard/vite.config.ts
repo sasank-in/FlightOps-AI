@@ -32,12 +32,16 @@ function contentSecurityPolicy(): Plugin {
 
 export default defineConfig({
   plugins: [react(), contentSecurityPolicy()],
+  // Explicit IPv4 loopback: Vite's default "localhost" can bind IPv6 (::1) only on recent Node,
+  // which breaks http://127.0.0.1 links, health checks and start.bat. Local-only by design.
   server: {
+    host: "127.0.0.1",
     port: 5173,
     strictPort: true,
     proxy: { "/api": { target: BACKEND, changeOrigin: false } },
   },
   preview: {
+    host: "127.0.0.1",
     port: 4173,
     strictPort: true,
     proxy: { "/api": { target: BACKEND, changeOrigin: false } },
