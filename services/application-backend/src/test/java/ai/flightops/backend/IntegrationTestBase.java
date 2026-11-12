@@ -37,6 +37,10 @@ public abstract class IntegrationTestBase {
     @DynamicPropertySource
     static void inference(DynamicPropertyRegistry registry) {
         registry.add("flightops.inference.base-url", StubInferenceServer::url);
+        registry.add("flightops.llm.base-url", StubLlmServer::url);
+        registry.add("flightops.llm.provider", () -> "stub");
+        registry.add("flightops.llm.api-key", () -> "test-llm-key");
+        registry.add("flightops.llm.model", () -> "stub-llm");
     }
 
     @Autowired
@@ -48,10 +52,11 @@ public abstract class IntegrationTestBase {
 
     @BeforeEach
     void cleanDatabase() {
-        jdbc.execute("truncate anomaly_events, analysis_runs, telemetry_windows, flights, audit_events restart identity cascade");
+        jdbc.execute("truncate reports, anomaly_events, analysis_runs, telemetry_windows, flights, audit_events restart identity cascade");
         jdbc.update("delete from users where username <> 'admin'");
         jdbc.update("update users set enabled = true where username = 'admin'");
         StubInferenceServer.mode = StubInferenceServer.Mode.OK;
+        StubLlmServer.mode = StubLlmServer.Mode.MIXED;
     }
 
     protected record Resp(int status, JsonNode body, HttpResponse<String> raw) {}
@@ -73,7 +78,8 @@ public abstract class IntegrationTestBase {
                 b.header("Content-Type", "application/json").method(method, HttpRequest.BodyPublishers.ofString(text));
             }
             HttpResponse<String> r = http.send(b.build(), HttpResponse.BodyHandlers.ofString());
-            JsonNode json = r.body() == null || r.body().isBlank() ? null : JSON.readTree(r.body());
+            boolean isJson = r.headers().firstValue("Content-Type").map(t -> t.contains("json")).orElse(true);
+            JsonNode json = r.body() == null || r.body().isBlank() || !isJson ? null : JSON.readTree(r.body());
             return new Resp(r.statusCode(), json, r);
         } catch (Exception e) {
             throw new IllegalStateException(e);
@@ -142,5 +148,26 @@ public abstract class IntegrationTestBase {
             Thread.sleep(100);
         }
         throw new AssertionError("analysis did not finish in time");
+    }
+
+    protected JsonNode awaitReport(String token, long reportId) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + 20_000;
+        while (System.currentTimeMillis() < deadline) {
+            JsonNode body = send("GET", "/api/v1/reports/" + reportId, token, null).body();
+            String status = body.get("status").asString();
+            if (status.equals("COMPLETED") || status.equals("FAILED")) {
+                return body;
+            }
+            Thread.sleep(100);
+        }
+        throw new AssertionError("report did not finish in time");
+    }
+
+    /** Uploads a flight, analyses it and waits; returns {flightId, analysisId}. */
+    protected long[] analysedFlight(String token, String ref, double... airspeedPerWindow) throws InterruptedException {
+        long flight = upload(token, ref, airspeedPerWindow);
+        long run = send("POST", "/api/v1/flights/" + flight + "/analyses", token, null).body().get("id").asLong();
+        awaitAnalysis(token, run);
+        return new long[] {flight, run};
     }
 }

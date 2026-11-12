@@ -9,7 +9,7 @@ backend and frontend integration\
 **Primary language:** Python 3.12.10\
 **Project type:** Applied ML / Aerospace Data Analytics / AI
 Engineering\
-**Status (2026-11-11):** Phases 1--6 complete.
+**Status (2026-11-12):** Phases 1--7 complete.
 - Data is verified (`docs/dataset-card.md`).
 - The served detector is `if_tail_hybrid` 0.4.0 (Isolation Forest + per-feature tail rule, input
   set v3, per-aircraft sensor offsets removed); the autoencoder was compared
@@ -20,7 +20,11 @@ Engineering\
 
 - The React + TypeScript analyst dashboard is in `frontend/dashboard`.
 
-Phase 7 (AI engineering assistant) is next.
+- The AI engineering assistant writes evidence-grounded engineering reports (Groq,
+  `POST /api/v1/reports`): statements must cite the stored analysis evidence and are validated
+  before they are kept (`docs/api-contracts.md`).
+
+Phase 8 (MLOps and deployment) is next.
 
 ------------------------------------------------------------------------
 

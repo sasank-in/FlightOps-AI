@@ -53,9 +53,12 @@ async function toError(res: Response): Promise<ApiError> {
   return new ApiError(res.status, detail ?? FALLBACK[res.status] ?? `Request failed (HTTP ${res.status}).`, fieldErrors);
 }
 
-export async function api<T>(path: string, init: { method?: string; body?: unknown; auth?: boolean } = {}): Promise<T> {
-  const { method = "GET", body, auth = true } = init;
-  const headers: Record<string, string> = { Accept: "application/json" };
+export async function api<T>(
+  path: string,
+  init: { method?: string; body?: unknown; auth?: boolean; text?: boolean } = {},
+): Promise<T> {
+  const { method = "GET", body, auth = true, text = false } = init;
+  const headers: Record<string, string> = { Accept: text ? "text/markdown, text/plain;q=0.9, application/problem+json;q=0.5" : "application/json" };
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (auth && token) headers.Authorization = `Bearer ${token}`;
 
@@ -71,5 +74,5 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
     throw err;
   }
   if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+  return (text ? await res.text() : await res.json()) as T;
 }

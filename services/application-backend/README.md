@@ -1,4 +1,4 @@
-# FlightOps AI: Application Backend (Phase 5)
+# FlightOps AI: Application Backend (Phases 5 and 7)
 
 Spring Boot service providing **authentication, flight and telemetry storage, analysis jobs and an
 audit trail**. Scoring is delegated to the inference API (`services/inference-api`).
@@ -47,11 +47,13 @@ python services/application-backend/examples/e2e_demo.py --per-class 2
 | GET | `/flights?page=&size=` | analyst/admin | Own flights (admins: all), newest first, max 100 per page |
 | GET | `/flights/{id}` | owner/admin | Metadata and window list |
 | GET | `/flights/{id}/telemetry?window=k` | owner/admin | Telemetry of one window |
-| DELETE | `/flights/{id}` | owner/admin | Delete flight, windows, analyses and events |
+| DELETE | `/flights/{id}` | owner/admin | Delete flight, windows, analyses, events and reports |
 | POST | `/flights/{id}/analyses` | owner/admin | Start an analysis → **202** + `Location: /api/v1/analyses/{id}` |
 | GET | `/analyses/{id}` | owner/admin | Status `PENDING` / `RUNNING` / `COMPLETED` / `FAILED`, model, metrics |
 | GET | `/flights/{id}/analyses` | owner/admin | All runs of a flight |
 | GET | `/flights/{id}/anomalies?analysisId=&onlyAboveThreshold=` | owner/admin | Scored windows of the latest (or given) completed run, with evidence |
+| POST | `/reports` | owner/admin | `{analysisId}` of a completed analysis → **202**; evidence-grounded engineering report |
+| GET | `/reports/{id}`, `/reports/{id}/markdown`, `/flights/{id}/reports` | owner/admin | Report with content and evidence; Markdown download; reports of a flight |
 | GET | `/me`, `/model`, `/stats` | analyst/admin | Current user; model card (proxied from the inference API); dashboard statistics scoped to visible flights |
 | GET/POST | `/users`, PATCH `/users/{id}` | admin | List, create, enable or disable users |
 | GET | `/audit?limit=` | admin | Latest audit events |
@@ -79,21 +81,32 @@ Errors are RFC 9457 problem JSON (`title`, `status`, `detail`). Full schemas:
   threshold. It is deliberately not a safety severity.
 - **Secrets** come only from the environment or `.env`. The DB password, JWT secret and passwords are
   never logged. Telemetry is never logged.
+- **Engineering reports (Phase 7):** the backend builds an evidence package from the stored analysis
+  (never raw telemetry) and asks an OpenAI-compatible model (Groq `openai/gpt-oss-120b` by default;
+  `LLM_PROVIDER`, `LLM_API_KEY`, optional `FLIGHTOPS_LLM_MODEL`, `FLIGHTOPS_LLM_BASE_URL`) for a summary
+  and findings in JSON. Every statement must cite evidence refs, use only numbers found in the
+  evidence, and make no cause, fault, limit, safety or maintenance claim; failing statements are
+  removed and listed. Tables, limitations and provenance are written by the backend, not the model.
+  Without a key, on provider errors or when nothing passes validation, a deterministic template writes
+  the report. Separate worker pool (2 threads); 6 reports per user per minute.
 - **Storage:** one JSONB document per 160-second window (always read and scored per window) instead of
   3,200 rows per window.
 
 **Limitations:** the login lockout and rate limit are in-memory, so they apply per instance. There is no
-retention job yet; use `DELETE /flights/{id}`. Report generation (documentation.md §17) belongs to Phase 7.
+retention job yet; use `DELETE /flights/{id}`. Report validation is mechanical: it catches invented
+numbers, missing citations and forbidden claims, not every possible misreading, so reports still need
+engineering review.
 
 ## Tests
 
-`mvn -B test` runs **23 tests**:
+`mvn -B test` runs **30 tests**:
 
-- **Unit tests:** DATABASE_URL parsing, the login limiter, safe failure messages, and a check that the
-  20-variable list matches the Python schema.
+- **Unit tests:** DATABASE_URL parsing, the login and per-user limiters, safe failure messages, the
+  report statement validator, and a check that the 20-variable list matches the Python schema.
 - **Full-stack integration tests (`*IT`):** real HTTP, real PostgreSQL and a stub inference server.
   They cover auth, lockout, roles, revocation, ownership, validation, limits, cascade delete, the
-  analysis lifecycle and inference failures.
+  analysis lifecycle, inference failures, and reports (grounding, validation, fallback, rate-limit
+  retry, access, cascade) against a stub chat-completions server.
 
 The integration tests use a **separate database `flightops_test`** on the same server (credentials
 from `DATABASE_URL`). Create it once:

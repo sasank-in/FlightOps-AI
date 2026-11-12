@@ -63,7 +63,7 @@ class UnitTests {
     void loginLimiterLocksAndUnlocksOverTime() throws Exception {
         var props = new ai.flightops.backend.config.AppProperties(null,
                 new ai.flightops.backend.config.AppProperties.Security("x".repeat(32), Duration.ofHours(1), 3, Duration.ofMinutes(15)),
-                null, null, null, null);
+                null, null, null, null, null, null);
         MutableClock clock = new MutableClock(Instant.parse("2026-01-01T00:00:00Z"));
         var ctor = ai.flightops.backend.auth.LoginAttemptLimiter.class.getDeclaredConstructor(
                 ai.flightops.backend.config.AppProperties.class, Clock.class);
@@ -80,6 +80,39 @@ class UnitTests {
         limiter.recordFailure("eve");                            // counting restarts after lockout expires
         assertThat(limiter.isLocked("eve")).isFalse();
         limiter.recordSuccess("eve");
+    }
+
+    @Test
+    void reportValidatorRejectsInventedNumbersAndOutOfScopeClaims() {
+        java.util.Set<Double> ev = java.util.Set.of(0.9713, 0.25, 160.0, 319.0, 3.0, 12.5, 2.41);
+        var check = (java.util.function.Function<String, String>) s ->
+                ai.flightops.backend.report.ReportComposer.check(s, ev);
+        assertThat(check.apply("Window 3 scored 0.25, above the threshold of 0.971.")).isNull();   // rounding allowed
+        assertThat(check.apply("Seconds 160 to 319 in W3.")).isNull();                              // refs are not numbers
+        assertThat(check.apply("12.5% of windows were above the threshold.")).isNull();
+        assertThat(check.apply("The z-score was 2.4.")).isNull();
+        assertThat(check.apply("The z-score was -2.41.")).isNull();
+        assertThat(check.apply("Score 0.98 in window 3.")).contains("0.98");
+        assertThat(check.apply("Window 2 was unusual.")).contains("number 2");     // small whole numbers must match exactly
+        assertThat(check.apply("Airspeed was 13 kt high.")).isNull();              // 12.5 rounds to 13
+        assertThat(check.apply("This may indicate a malfunction of the sensor.")).contains("malfunction");
+        assertThat(check.apply("We recommend an inspection.")).contains("recommend");
+        assertThat(check.apply("The pitot tube should be replaced.")).contains("should be replaced");
+        assertThat(check.apply("Possibly caused by a gust.")).contains("caused by");
+        assertThat(check.apply("It exceeded aircraft limits.")).contains("aircraft limits");
+        assertThat(check.apply("Not a safety determination; engineering review is needed.")).isNull();
+    }
+
+    @Test
+    void perUserLimiterResetsEachMinuteAndIsPerUser() {
+        MutableClock clock = new MutableClock(Instant.parse("2026-01-01T00:00:00Z"));
+        var limiter = new ai.flightops.backend.common.PerUserMinuteLimiter(2, clock);
+        assertThat(limiter.tryAcquire(1)).isTrue();
+        assertThat(limiter.tryAcquire(1)).isTrue();
+        assertThat(limiter.tryAcquire(1)).isFalse();
+        assertThat(limiter.tryAcquire(2)).isTrue();
+        clock.now = clock.now.plusSeconds(60);
+        assertThat(limiter.tryAcquire(1)).isTrue();
     }
 
     static final class MutableClock extends Clock {

@@ -60,3 +60,16 @@ flightops:
     max-starts-per-minute: 30
     worker-threads: 2
     queue-capacity: 100
+  llm:
+    # LLM_PROVIDER / LLM_API_KEY from .env. "none" or no key: deterministic reports only.
+    provider: ${LLM_PROVIDER:none}
+    api-key: ${LLM_API_KEY:}
+    base-url: ${FLIGHTOPS_LLM_BASE_URL:https://api.groq.com/openai/v1}
+    model: ${FLIGHTOPS_LLM_MODEL:openai/gpt-oss-120b}
+    timeout: PT60S
+    max-completion-tokens: 2500
+  reports:
+    max-per-minute: 6
+    worker-threads: 2
+    queue-capacity: 50
+    max-evidence-windows: 8

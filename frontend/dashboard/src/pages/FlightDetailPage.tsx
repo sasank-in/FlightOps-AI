@@ -6,6 +6,7 @@ import { ApiError } from "../api/client";
 import { endpoints } from "../api/endpoints";
 import type { AnomalyEvent, WindowInfo } from "../api/types";
 import { ChartCard } from "../components/ChartCard";
+import { ReportCard } from "../components/ReportCard";
 import { ScoreTimeline, TelemetryLine } from "../components/charts";
 import { IconPlay, IconTrash } from "../components/Icons";
 import {
@@ -93,6 +94,11 @@ export function FlightDetailPage() {
     setSelected((cur) => cur ?? firstAlert?.windowIndex ?? anomalies.data?.events[0]?.windowIndex ?? 0);
   }, [anomalies.isSuccess, anomalies.data]);
   const selectedEvent = events.find((e) => e.windowIndex === selected);
+  // From a report citation: select the window and bring its evidence into view
+  const selectWindow = (w: number) => {
+    setSelected(w);
+    document.getElementById("window-detail")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   if (!valid) return <ErrorBanner error={new ApiError(404, "Flight not found.")} />;
   if (flight.isPending) return <Loading />;
@@ -146,11 +152,13 @@ export function FlightDetailPage() {
           />
 
         {/* master/detail: the selected window's evidence beside its telemetry */}
-        <div className="grid grid-side-main equal">
+        <div className="grid grid-side-main equal" id="window-detail">
           <WindowPanel event={selectedEvent} windowIndex={selected} hasAnalysis={!!anomalies.data} />
           <TelemetryCard flightId={id} windows={flight.data.windows}
             windowIndex={selected ?? 0} onWindow={setSelected} />
         </div>
+
+        <ReportCard key={id} flightId={id} analysisId={anomalies.data?.analysisId ?? null} onSelectWindow={selectWindow} />
 
         <Card title="Analysis history" subtitle="Every analysis run for this flight" flush>
           {analyses.isPending && <Loading />}

@@ -24,4 +24,20 @@ public class AsyncConfig {
         ex.initialize();
         return ex;
     }
+
+    public static final String REPORT_EXECUTOR = "reportExecutor";
+
+    /** Separate pool so slow language-model calls never delay analyses. */
+    @Bean(name = REPORT_EXECUTOR)
+    ThreadPoolTaskExecutor reportExecutor(AppProperties props) {
+        ThreadPoolTaskExecutor ex = new ThreadPoolTaskExecutor();
+        ex.setCorePoolSize(props.reports().workerThreads());
+        ex.setMaxPoolSize(props.reports().workerThreads());
+        ex.setQueueCapacity(props.reports().queueCapacity());
+        ex.setThreadNamePrefix("report-");
+        ex.setWaitForTasksToCompleteOnShutdown(true);
+        ex.setAwaitTerminationSeconds(30);
+        ex.initialize();
+        return ex;
+    }
 }

@@ -21,7 +21,8 @@ The full project plan is in [documentation.md](documentation.md).
 | 4 | FastAPI inference service | Done |
 | 5 | Spring Boot application backend + PostgreSQL | Done |
 | 6 | React + TypeScript analyst dashboard | Done |
-| 7–8 | AI engineering assistant, MLOps | Not started |
+| 7 | AI engineering assistant: evidence-grounded reports (Groq), validated statement by statement | Done |
+| 8 | MLOps and deployment | Not started |
 
 ```text
 React dashboard :5173 ──/api──> Spring Boot backend :8080 ──> FastAPI inference API :8000 ──> if_tail_hybrid 0.4.0

@@ -335,7 +335,10 @@ a:hover { text-decoration: underline; }
 .card-head {
   display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
   padding: 16px 20px 12px;
+  flex-wrap: wrap;                       /* actions drop below the title when space runs out */
 }
+.card-head > div:first-child { flex: 1 1 220px; min-width: 0; }
+.card-head > .row { flex-wrap: wrap; }
 .card-head p { color: var(--ink-3); font-size: 12.5px; margin-top: 2px; }
 .card-body { padding: 4px 20px 20px; }
 .card-body.flush { padding: 0; }
@@ -600,3 +603,26 @@ table.data tr.clickable { cursor: pointer; }
 .search .input { width: 100%; padding-left: 34px; }
 .list-toolbar .hint { margin-left: auto; }
 @media (max-width: 640px) { .search { max-width: none; } .list-toolbar .hint { margin-left: 0; } }
+
+/* ---------------------------------------------------------------- engineering report */
+.report { display: flex; flex-direction: column; gap: 14px; }
+.report h3 { font-size: 13px; font-weight: 600; color: var(--ink); margin-bottom: 6px; }
+.report p { line-height: 1.55; }
+.report-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; color: var(--ink-2); font-size: 12.5px; }
+.findings { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.findings li { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; align-items: start; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.findings li:last-child { border-bottom: 0; padding-bottom: 0; }
+.findings p { overflow-wrap: anywhere; }
+.refs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.ref {
+  display: inline-flex; align-items: center; height: 22px; padding: 0 8px;
+  border: 1px solid var(--border-strong); border-radius: 4px; background: var(--card);
+  font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--link); cursor: pointer;
+}
+button.ref:hover { background: var(--accent-soft); border-color: transparent; color: var(--accent-soft-ink); }
+button.ref:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.ref-static { cursor: help; color: var(--ink-2); }
+.limits { margin: 0; padding-left: 18px; color: var(--ink-2); display: flex; flex-direction: column; gap: 4px; line-height: 1.5; }
+.removed summary { cursor: pointer; font-size: 12.5px; color: var(--ink-2); }
+.removed ul { margin: 8px 0 0; padding-left: 18px; font-size: 12.5px; display: flex; flex-direction: column; gap: 4px; }
+@media (max-width: 640px) { .findings li { grid-template-columns: minmax(0, 1fr); gap: 6px; } }

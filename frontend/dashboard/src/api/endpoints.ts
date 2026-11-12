@@ -8,6 +8,8 @@ import type {
   Me,
   ModelCard,
   Page,
+  Report,
+  ReportSummary,
   Role,
   Stats,
   TelemetryResponse,
@@ -34,6 +36,11 @@ export const endpoints = {
   analysis: (id: number) => api<Analysis>(`/api/v1/analyses/${id}`),
   analyses: (flightId: number) => api<Analysis[]>(`/api/v1/flights/${flightId}/analyses`),
   anomalies: (flightId: number) => api<Anomalies>(`/api/v1/flights/${flightId}/anomalies`),
+
+  createReport: (analysisId: number) => api<Report>("/api/v1/reports", { method: "POST", body: { analysisId } }),
+  report: (id: number) => api<Report>(`/api/v1/reports/${id}`),
+  reports: (flightId: number) => api<ReportSummary[]>(`/api/v1/flights/${flightId}/reports`),
+  reportMarkdown: (id: number) => api<string>(`/api/v1/reports/${id}/markdown`, { text: true }),
 
   users: () => api<User[]>("/api/v1/users"),
   createUser: (username: string, password: string, role: Role) =>

@@ -154,7 +154,7 @@ Response: `{"id", "externalFlightReference", "datasetId", "nWindows", "ownerId",
 | GET | `/flights?page=0&size=20&q=` | `{"items": [flight...], "page", "size", "totalItems", "totalPages"}`. Own flights; admins see all. Optional `q` (≤128 chars, otherwise `400`) is a case-insensitive substring match on `externalFlightReference`; `%` and `_` match literally. Each list item also has `latestAnalysis`: `{"id", "status", "nAboveThreshold", "nWindows"}` for the flight's newest run, or `null` if the flight has never been analysed. The counts are `null` until the run completes |
 | GET | `/flights/{id}` | `{"flight": {...}, "metadata": {...}, "windows": [{"windowIndex", "windowStartSeconds", "windowEndSeconds"}]}` |
 | GET | `/flights/{id}/telemetry?window=k` | `{"flightId", "windowIndex", "windowStartSeconds", "windowEndSeconds", "telemetry": {20 variables}}` |
-| DELETE | `/flights/{id}` | `204`. Windows, analyses and events are deleted too |
+| DELETE | `/flights/{id}` | `204`. Windows, analyses, events and reports are deleted too |
 
 A flight owned by another analyst returns `404`, not `403`, so its existence is not revealed.
 
@@ -207,10 +207,52 @@ by default. It returns `409` if the given run is not completed, and `404` if the
 | GET | `/audit?limit=100` | `[{"id", "at", "username", "action", "entityType", "entityId", "outcome", "detail"}]` |
 
 Audited actions: `LOGIN`, `USER_CREATE`, `USER_ENABLE`/`USER_DISABLE`, `FLIGHT_UPLOAD`, `FLIGHT_ACCESS`
-(denied), `FLIGHT_DELETE`, `ANALYSIS_START`, `ANALYSIS_ACCESS` (denied). Outcomes are `SUCCESS`,
+(denied), `FLIGHT_DELETE`, `ANALYSIS_START`, `ANALYSIS_ACCESS` (denied), `REPORT_CREATE`, `REPORT_ACCESS`
+(denied). Outcomes are `SUCCESS`,
 `DENIED` and `FAILURE`. Details never contain passwords, tokens or telemetry.
 
-### Not yet implemented
+### Engineering reports (Phase 7, asynchronous)
 
-`POST /api/v1/reports` and `GET /api/v1/reports/{id}` (documentation.md §17) depend on the AI assistant
-and are planned for Phase 7.
+`POST /api/v1/reports` with `{"analysisId": 3}` → `202` + `Location: /api/v1/reports/{id}`. The
+analysis must be `COMPLETED` (otherwise `409`) and visible to the user (otherwise `404`). Rate limit: 6
+reports per user per minute (`429`). Poll `GET /api/v1/reports/{id}` until `COMPLETED` or `FAILED`:
+
+```json
+{
+  "id": 5, "flightId": 3, "analysisId": 3, "status": "COMPLETED",
+  "generator": "llm", "llmProvider": "groq", "llmModel": "openai/gpt-oss-120b", "promptVersion": "r1",
+  "fallbackReason": null, "createdAt": "...", "completedAt": "...", "error": null,
+  "content": {
+    "summary": "6 of 16 windows scored at or above the threshold of 0.9713 ...",
+    "findings": [
+      {"statement": "Window 5 (seconds 800-959) has the highest score, 1.0.", "basis": "model_output", "evidence": ["W5"]}
+    ],
+    "removed": [{"statement": "...", "reason": "number 7.5 is not in the evidence"}],
+    "summaryReplaced": false
+  },
+  "evidence": {"schema": "flightops.report-evidence/1", "flight": {}, "analysis": {"ref": "RUN"}, "definitions": {},
+               "evaluation": {"ref": "EVAL"}, "intervals": [{"ref": "I1"}], "windows": [{"ref": "W5"}],
+               "variables": [{"ref": "V1"}], "quality_flags": {}, "omitted": {}, "limitations": []}
+}
+```
+
+- **`evidence`** is the exact package the writer received: verified results of the analysis only (run
+  totals, model definitions and evaluation figures, above-threshold intervals, up to 8 highest-scoring
+  windows with score components, top supporting features and raised quality flags, the variables most
+  often unusual, and fixed limitations). Raw telemetry is never included. Each item has a `ref`.
+- **`basis`** of a finding: `measured` (recorded value or time), `model_output` (scores, thresholds,
+  z-scores, counts) or `interpretation` (a hedged reading of the evidence).
+- **Validation.** A statement from the language model is kept only if it cites existing refs, every
+  number in it appears in the evidence (rounding allowed), and it makes no causal, fault, limit,
+  safety or maintenance claim. A `measured` statement that talks about scores is relabelled
+  `model_output`. Removed statements and the reason are listed in `removed`.
+- **`generator`** is `llm`, or `deterministic` when the model is not configured, fails (one retry on
+  HTTP 429) or produces nothing that passes validation. `fallbackReason` then says why.
+
+| Method | Path | Response |
+|--------|------|----------|
+| GET | `/flights/{id}/reports` | `[{"id", "flightId", "analysisId", "status", "generator", "llmModel", "createdAt", "completedAt", "error"}]`, newest first |
+| GET | `/reports/{id}/markdown` | The report as a Markdown document (`text/markdown`, attachment). `409` until `COMPLETED` |
+
+Reports follow the flight's access rules (another user's report is `404`, audited as `REPORT_ACCESS`
+`DENIED`) and are deleted with the flight or analysis.

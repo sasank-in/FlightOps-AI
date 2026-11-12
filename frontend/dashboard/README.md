@@ -1,4 +1,4 @@
-# FlightOps AI: Analyst Dashboard (Phase 6)
+# FlightOps AI: Analyst Dashboard (Phases 6 and 7)
 
 React + TypeScript dashboard for the application backend (`services/application-backend`).
 
@@ -32,8 +32,8 @@ backend that is not on `127.0.0.1:8080`.
 | Page | Content |
 |------|---------|
 | **Overview** | KPI tiles (flights, windows analysed, above threshold, analyses); windows above threshold by flight; recent analyses; model in service |
-| **Flights** | Paged list; upload a flight as JSON, validated in the browser before sending |
-| **Flight detail** | Anomaly score per window with the threshold; selected-window evidence (score components, most unusual signals with z-score and tail probability, data-quality flags); telemetry small multiples for any 6 of the 20 signals; run, re-run or delete; analysis history with live status |
+| **Flights** | Paged list with each flight's latest analysis status and windows above threshold; reference search (debounced, kept in the URL); upload a flight as JSON, validated in the browser before sending |
+| **Flight detail** | Anomaly score per window with the threshold; selected-window evidence (score components, most unusual signals with z-score and tail probability, data-quality flags); telemetry small multiples for any 6 of the 20 signals; run, re-run or delete; **engineering report** (generate, live status, findings labelled measured / model output / interpretation with clickable evidence refs that select the cited window, limitations, statements removed by validation, Markdown download); analysis history with live status |
 | **Compare flights** | One signal from two windows on a common axis, with both anomaly scores |
 | **Model** | Model card: version, threshold policy, test and unseen-aircraft metrics, input signals and units |
 | **Users / Audit log** | Admin only: create, enable or disable accounts; audit trail |
@@ -75,9 +75,10 @@ Design audit and changes: [docs/design-audit.md](../../docs/design-audit.md).
 
 ```powershell
 npm run typecheck      # strict TypeScript (incl. noUncheckedIndexedAccess), tests included
-npm test               # 17 tests
+npm test               # 21 tests
 npm run screenshots    # visual QA in the installed Microsoft Edge; fails on console errors or failed requests
 node scripts/audit-capture.mjs   # responsive (1024 / 390 px), empty states, focus, validation; fails on mobile overflow
+node scripts/report-capture.mjs  # generates a report on the dev server (:5173) and captures it light / dark / mobile, plus flight search
 ```
 
 The tests cover:
@@ -86,7 +87,10 @@ The tests cover:
 - upload validation and the API client's error handling;
 - the full sign-in flow, including role-based navigation and sign-out on 401;
 - that badges always carry an icon and a label;
-- the chart/table toggle.
+- the chart/table toggle;
+- flight search (debounced, one request per pause) and the latest-analysis columns;
+- the report panel: finding basis labels, evidence refs that select windows, removed statements,
+  disabled generation without a completed analysis, and progress after a request.
 
 `npm run screenshots` needs the three services and the preview server running. It takes
 `FLIGHTOPS_UI_USER` / `FLIGHTOPS_UI_PASSWORD` and writes PNGs to `screenshots/` (git-ignored).

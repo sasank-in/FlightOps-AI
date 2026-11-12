@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { setToken } from "../api/client";
 import { App } from "../App";
 import { ChartCard } from "../components/ChartCard";
+import { ReportCard } from "../components/ReportCard";
+import { ToastProvider } from "../components/toast";
 import { StatusBadge, ThresholdBadge } from "../components/ui";
 import { AuthProvider } from "../lib/auth";
 import { ThemeProvider } from "../lib/theme";
@@ -157,6 +159,79 @@ describe("flights list", () => {
     expect(await screen.findByRole("heading", { name: "No matching flights" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Clear search" }));
     expect(await screen.findByRole("link", { name: "BRAVO-2" })).toBeInTheDocument();
+  });
+});
+
+describe("engineering report", () => {
+  const REPORT = {
+    id: 5, flightId: 3, analysisId: 9, status: "COMPLETED", generator: "llm", llmProvider: "groq",
+    llmModel: "openai/gpt-oss-120b", promptVersion: "r1", fallbackReason: null, error: null,
+    createdAt: new Date().toISOString(), completedAt: new Date().toISOString(),
+    content: {
+      summary: "6 of 16 windows were above the threshold.",
+      findings: [
+        { statement: "Window 5 has the highest score, 1.", basis: "model_output", evidence: ["W5", "RUN"] },
+        { statement: "Window 5 spans seconds 800 to 959.", basis: "measured", evidence: ["W5"] },
+      ],
+      removed: [{ statement: "The sensor should be replaced.", reason: "makes a claim outside the evidence (\"should be replaced\")" }],
+      summaryReplaced: false,
+    },
+    evidence: {
+      schema: "flightops.report-evidence/1",
+      analysis: { analysis_id: 9, model_name: "if_tail_hybrid", model_version: "0.4.0", n_windows_scored: 16, n_windows_above_threshold: 6 },
+      intervals: [], variables: [],
+      windows: [{ ref: "W5", window_index: 5, start_seconds: 800, end_seconds: 959, anomaly_score: 1, threshold: 0.97, above_threshold: true }],
+      limitations: ["Not a confirmed fault or a safety determination."],
+    },
+  };
+
+  function renderCard(analysisId: number | null, reports: unknown[], onSelect = vi.fn()) {
+    const calls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn((url: string, init?: RequestInit) => {
+      calls.push(`${init?.method ?? "GET"} ${url}`);
+      if (url === "/api/v1/flights/3/reports") return json(reports);
+      if (url === "/api/v1/reports/5") return json(REPORT);
+      if (url === "/api/v1/reports" && init?.method === "POST") return json({ ...REPORT, id: 6, status: "PENDING", content: null, evidence: null }, 202);
+      if (url === "/api/v1/reports/6") return json({ ...REPORT, id: 6, status: "RUNNING", content: null, evidence: null });
+      return json({}, 404);
+    }));
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={qc}><ToastProvider>
+      <ReportCard flightId={3} analysisId={analysisId} onSelectWindow={onSelect} />
+    </ToastProvider></QueryClientProvider>);
+    return { calls, onSelect };
+  }
+
+  it("shows findings with their basis and evidence, removed statements, and selects cited windows", async () => {
+    const { onSelect } = renderCard(9, [{ ...REPORT, content: undefined, evidence: undefined }]);
+    expect(await screen.findByText("Window 5 has the highest score, 1.")).toBeInTheDocument();
+    expect(screen.getByText("Written by openai/gpt-oss-120b")).toBeInTheDocument();
+    expect(screen.getByText("Measured")).toBeInTheDocument();
+    expect(screen.getByText("Model output")).toBeInTheDocument();
+    expect(screen.getByText("Statements removed by validation (1)")).toBeInTheDocument();
+    expect(screen.getByText(/1 removed/)).toBeInTheDocument();
+    expect(screen.getByText("Not a confirmed fault or a safety determination.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Markdown" })).toBeInTheDocument();
+
+    const user = userEvent.setup();
+    await user.click(screen.getAllByRole("button", { name: "W5" })[0]!);
+    expect(onSelect).toHaveBeenCalledWith(5);
+    expect(screen.getAllByText("RUN")[0]!.tagName).toBe("SPAN");       // non-window refs are not buttons
+  });
+
+  it("needs a completed analysis, and starts a report on request", async () => {
+    renderCard(null, []);
+    expect(await screen.findByText("No report yet")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Generate report" })).toBeDisabled();
+  });
+
+  it("posts the analysis id and shows progress", async () => {
+    const { calls } = renderCard(9, []);
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Generate report" }));
+    expect(await screen.findByText(/Writing report #6/)).toBeInTheDocument();
+    expect(calls).toContain("POST /api/v1/reports");
+    expect(screen.getByRole("button", { name: "Writing report…" })).toBeDisabled();
   });
 });
 

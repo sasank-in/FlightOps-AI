@@ -198,3 +198,60 @@ export interface UploadBody {
   metadata?: Record<string, unknown>;
   windows: UploadWindow[];
 }
+
+// ---- Engineering reports (Phase 7) -------------------------------------------------------------
+
+export type FindingBasis = "measured" | "model_output" | "interpretation";
+
+export interface ReportFinding {
+  statement: string;
+  basis: FindingBasis;
+  evidence: string[];
+}
+
+export interface ReportContent {
+  summary: string;
+  findings: ReportFinding[];
+  removed: { statement: string; reason: string }[];
+  summaryReplaced: boolean;
+}
+
+export interface EvidenceWindow {
+  ref: string;
+  window_index: number;
+  start_seconds: number;
+  end_seconds: number;
+  anomaly_score: number;
+  threshold: number;
+  above_threshold: boolean;
+}
+
+export interface ReportEvidence {
+  schema: string;
+  analysis: { analysis_id: number; model_name: string; model_version: string; n_windows_scored: number; n_windows_above_threshold: number };
+  intervals: { ref: string; first_window: number; last_window: number; start_seconds: number; end_seconds: number; n_windows: number }[];
+  windows: EvidenceWindow[];
+  variables: { ref: string; feature: string; n_above_threshold_windows: number }[];
+  limitations: string[];
+}
+
+export interface ReportSummary {
+  id: number;
+  flightId: number;
+  analysisId: number;
+  status: AnalysisStatus;
+  generator: "llm" | "deterministic" | null;
+  llmModel: string | null;
+  createdAt: string;
+  completedAt: string | null;
+  error: string | null;
+}
+
+export interface Report extends Omit<ReportSummary, "llmModel"> {
+  llmProvider: string | null;
+  llmModel: string | null;
+  promptVersion: string | null;
+  fallbackReason: string | null;
+  content: ReportContent | null;
+  evidence: ReportEvidence | null;
+}
