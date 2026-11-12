@@ -3,6 +3,7 @@ package ai.flightops.backend.flight;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import ai.flightops.backend.audit.AuditEvent.Outcome;
 import ai.flightops.backend.audit.AuditService;
@@ -11,6 +12,7 @@ import ai.flightops.backend.config.AppProperties;
 import ai.flightops.backend.flight.FlightDtos.FlightDetail;
 import ai.flightops.backend.flight.FlightDtos.FlightSummary;
 import ai.flightops.backend.flight.FlightDtos.FlightUploadRequest;
+import ai.flightops.backend.flight.FlightDtos.LatestAnalysis;
 import ai.flightops.backend.flight.FlightDtos.PageResponse;
 import ai.flightops.backend.flight.FlightDtos.TelemetryResponse;
 import ai.flightops.backend.flight.FlightDtos.WindowInfo;
@@ -72,14 +74,28 @@ public class FlightService {
     }
 
     @Transactional(readOnly = true)
-    public PageResponse<FlightSummary> list(CurrentUser user, int page, int size) {
+    public PageResponse<FlightSummary> list(CurrentUser user, int page, int size, String query) {
         if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
             throw ApiException.badRequest("page must be >= 0 and size between 1 and " + MAX_PAGE_SIZE);
         }
+        String q = query == null ? "" : query.trim();
+        if (q.length() > 128) {
+            throw ApiException.badRequest("q must be at most 128 characters");
+        }
         PageRequest pr = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt").and(Sort.by(Sort.Direction.DESC, "id")));
-        Page<Flight> result = user.isAdmin() ? flights.findAll(pr) : flights.findByOwnerId(user.id(), pr);
-        return new PageResponse<>(result.map(FlightSummary::of).getContent(), page, size,
-                result.getTotalElements(), result.getTotalPages());
+        Page<Flight> result;
+        if (q.isEmpty()) {
+            result = user.isAdmin() ? flights.findAll(pr) : flights.findByOwnerId(user.id(), pr);
+        } else {   // parameterised LIKE via Spring Data; wildcards in q are matched literally
+            result = user.isAdmin() ? flights.findByExternalFlightReferenceContainingIgnoreCase(q, pr)
+                    : flights.findByOwnerIdAndExternalFlightReferenceContainingIgnoreCase(user.id(), q, pr);
+        }
+        List<Long> ids = result.getContent().stream().map(Flight::getId).toList();
+        Map<Long, LatestAnalysis> latest = ids.isEmpty() ? Map.of() : flights.findLatestRuns(ids).stream()
+                .collect(Collectors.toMap(FlightRepository.LatestRun::getFlightId,
+                        r -> new LatestAnalysis(r.getAnalysisId(), r.getStatus(), r.getNAboveThreshold(), r.getNWindows())));
+        List<FlightSummary> items = result.getContent().stream().map(f -> FlightSummary.of(f, latest.get(f.getId()))).toList();
+        return new PageResponse<>(items, page, size, result.getTotalElements(), result.getTotalPages());
     }
 
     /** Returns the flight if the user may see it; otherwise 404 (existence is not revealed). */

@@ -151,7 +151,7 @@ Response: `{"id", "externalFlightReference", "datasetId", "nWindows", "ownerId",
 
 | Method | Path | Response |
 |--------|------|----------|
-| GET | `/flights?page=0&size=20` | `{"items": [flight...], "page", "size", "totalItems", "totalPages"}`. Own flights; admins see all |
+| GET | `/flights?page=0&size=20&q=` | `{"items": [flight...], "page", "size", "totalItems", "totalPages"}`. Own flights; admins see all. Optional `q` (≤128 chars, otherwise `400`) is a case-insensitive substring match on `externalFlightReference`; `%` and `_` match literally. Each list item also has `latestAnalysis`: `{"id", "status", "nAboveThreshold", "nWindows"}` for the flight's newest run, or `null` if the flight has never been analysed. The counts are `null` until the run completes |
 | GET | `/flights/{id}` | `{"flight": {...}, "metadata": {...}, "windows": [{"windowIndex", "windowStartSeconds", "windowEndSeconds"}]}` |
 | GET | `/flights/{id}/telemetry?window=k` | `{"flightId", "windowIndex", "windowStartSeconds", "windowEndSeconds", "telemetry": {20 variables}}` |
 | DELETE | `/flights/{id}` | `204`. Windows, analyses and events are deleted too |

@@ -15,6 +15,13 @@ export interface TokenResponse {
   expires_in: number;
 }
 
+export interface LatestAnalysis {
+  id: number;
+  status: AnalysisStatus;
+  nAboveThreshold: number | null;
+  nWindows: number | null;
+}
+
 export interface FlightSummary {
   id: number;
   externalFlightReference: string;
@@ -22,6 +29,7 @@ export interface FlightSummary {
   nWindows: number;
   ownerId: number;
   createdAt: string;
+  latestAnalysis?: LatestAnalysis | null;
 }
 
 export interface Page<T> {

@@ -106,6 +106,60 @@ describe("sign-in and overview", () => {
   });
 });
 
+describe("flights list", () => {
+  const flight = (id: number, ref: string, latestAnalysis: unknown) => ({
+    id, externalFlightReference: ref, datasetId: null, nWindows: 8, ownerId: 1,
+    createdAt: new Date().toISOString(), latestAnalysis,
+  });
+  const page = (items: unknown[]) => ({ items, page: 0, size: 20, totalItems: items.length, totalPages: 1 });
+
+  it("shows each flight's latest analysis and searches by reference through the URL", async () => {
+    const flightCalls: string[] = [];
+    renderApp((url) => {
+      if (url === "/api/v1/auth/login") return json({ access_token: "t", token_type: "Bearer", expires_in: 3600 });
+      if (url === "/api/v1/me") return json({ id: 1, username: "admin", role: "ADMIN" });
+      if (url === "/api/v1/stats") return json(STATS);
+      if (url === "/api/v1/model") return json(MODEL);
+      if (url.startsWith("/api/v1/flights?")) {
+        flightCalls.push(url);
+        if (url.includes("q=zulu")) return json(page([]));
+        if (url.includes("q=alpha")) return json(page([flight(1, "ALPHA-1", { id: 9, status: "COMPLETED", nAboveThreshold: 3, nWindows: 8 })]));
+        return json(page([
+          flight(2, "BRAVO-2", null),
+          flight(1, "ALPHA-1", { id: 9, status: "COMPLETED", nAboveThreshold: 3, nWindows: 8 }),
+          flight(3, "CHARLIE-3", { id: 10, status: "RUNNING", nAboveThreshold: null, nWindows: null }),
+        ]));
+      }
+      return json({}, 404);
+    });
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("Username"), "admin");
+    await user.type(screen.getByLabelText("Password"), "correct-horse-battery");
+    await user.click(screen.getByRole("button", { name: "Sign in" }));
+    await user.click(await screen.findByRole("link", { name: "Flights" }));
+
+    const bravo = (await screen.findByRole("link", { name: "BRAVO-2" })).closest("tr")!;
+    expect(within(bravo).getByText("Not analysed")).toBeInTheDocument();
+    const alpha = screen.getByRole("link", { name: "ALPHA-1" }).closest("tr")!;
+    expect(within(alpha).getByText("Completed")).toBeInTheDocument();
+    expect(within(alpha).getByText("3 / 8")).toHaveClass("badge-critical");
+    expect(within(screen.getByRole("link", { name: "CHARLIE-3" }).closest("tr")!).getByText("Running")).toBeInTheDocument();
+
+    const search = screen.getByRole("searchbox", { name: "Search flight reference" });
+    await user.type(search, "alpha");
+    await waitFor(() => expect(screen.queryByRole("link", { name: "BRAVO-2" })).not.toBeInTheDocument());
+    expect(screen.getByText("1 match")).toBeInTheDocument();
+    expect(flightCalls.at(-1)).toContain("q=alpha");
+    expect(flightCalls.some((u) => /q=a(&|$)/.test(u))).toBe(false);      // debounced: no request per keystroke
+
+    await user.clear(search);
+    await user.type(search, "zulu");
+    expect(await screen.findByRole("heading", { name: "No matching flights" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Clear search" }));
+    expect(await screen.findByRole("link", { name: "BRAVO-2" })).toBeInTheDocument();
+  });
+});
+
 describe("components", () => {
   it("status badges always pair an icon with a text label", () => {
     render(<><ThresholdBadge above /><ThresholdBadge above={false} /><StatusBadge status="FAILED" /></>);

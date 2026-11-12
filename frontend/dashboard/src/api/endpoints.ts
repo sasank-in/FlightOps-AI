@@ -23,7 +23,8 @@ export const endpoints = {
   stats: () => api<Stats>("/api/v1/stats"),
   model: () => api<ModelCard>("/api/v1/model"),
 
-  flights: (page: number, size: number) => api<Page<FlightSummary>>(`/api/v1/flights?page=${page}&size=${size}`),
+  flights: (page: number, size: number, q = "") =>
+    api<Page<FlightSummary>>(`/api/v1/flights?page=${page}&size=${size}${q ? `&q=${encodeURIComponent(q)}` : ""}`),
   flight: (id: number) => api<FlightDetail>(`/api/v1/flights/${id}`),
   telemetry: (id: number, window: number) => api<TelemetryResponse>(`/api/v1/flights/${id}/telemetry?window=${window}`),
   upload: (body: UploadBody) => api<FlightSummary>("/api/v1/flights/upload", { method: "POST", body }),

@@ -44,8 +44,9 @@ public class FlightController {
     @GetMapping
     public PageResponse<FlightSummary> list(@AuthenticationPrincipal Jwt jwt,
                                             @RequestParam(defaultValue = "0") int page,
-                                            @RequestParam(defaultValue = "20") int size) {
-        return service.list(userContext.resolve(jwt), page, size);
+                                            @RequestParam(defaultValue = "20") int size,
+                                            @RequestParam(required = false) String q) {
+        return service.list(userContext.resolve(jwt), page, size, q);
     }
 
     @GetMapping("/{id}")

@@ -37,6 +37,32 @@ class FlightIT extends IntegrationTestBase {
     }
 
     @Test
+    void listSearchesByReferenceAndShowsEachFlightsLatestAnalysis() throws InterruptedException {
+        String alice = createUser(adminToken(), "alice", "ANALYST");
+        long a320 = upload(alice, "ALPHA-320", 150, 250);
+        upload(alice, "BRAVO-737", 150);
+        long run = send("POST", "/api/v1/flights/" + a320 + "/analyses", alice, null).body().get("id").asLong();
+        awaitAnalysis(alice, run);
+
+        JsonNode all = send("GET", "/api/v1/flights", alice, null).body();
+        assertThat(all.get("totalItems").asLong()).isEqualTo(2);
+        JsonNode bravo = all.get("items").get(0);                       // newest first, never analysed
+        assertThat(bravo.get("externalFlightReference").asString()).isEqualTo("BRAVO-737");
+        assertThat(bravo.get("latestAnalysis").isNull()).isTrue();
+        JsonNode alpha = all.get("items").get(1).get("latestAnalysis");
+        assertThat(alpha.get("id").asLong()).isEqualTo(run);
+        assertThat(alpha.get("status").asString()).isEqualTo("COMPLETED");
+        assertThat(alpha.get("nAboveThreshold").asInt()).isEqualTo(1);
+        assertThat(alpha.get("nWindows").asInt()).isEqualTo(2);
+
+        JsonNode found = send("GET", "/api/v1/flights?q=alpha", alice, null).body();   // case-insensitive
+        assertThat(found.get("totalItems").asLong()).isEqualTo(1);
+        assertThat(found.get("items").get(0).get("id").asLong()).isEqualTo(a320);
+        assertThat(send("GET", "/api/v1/flights?q=%25", alice, null).body().get("totalItems").asLong()).isZero(); // '%' is literal
+        assertThat(send("GET", "/api/v1/flights?q=" + "x".repeat(129), alice, null).status()).isEqualTo(400);
+    }
+
+    @Test
     void analystsOnlySeeTheirOwnFlightsAdminsSeeAll() {
         String admin = adminToken();
         String alice = createUser(admin, "alice", "ANALYST");

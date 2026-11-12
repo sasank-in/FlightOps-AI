@@ -54,6 +54,7 @@ export const IconInfo = (p: IconProps) => (<Icon {...p}><circle cx="12" cy="12" 
 export const IconChevron = (p: IconProps) => (<Icon {...p}><path d="m9 6 6 6-6 6" /></Icon>);
 export const IconShield = IconAudit;
 export const IconMenu = (p: IconProps) => (<Icon {...p}><path d="M4 6h16M4 12h16M4 18h16" /></Icon>);
+export const IconSearch = (p: IconProps) => (<Icon {...p}><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4.5 4.5" /></Icon>);
 export const IconDownload = (p: IconProps) => (
   <Icon {...p}><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5" /><path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" /></Icon>
 );

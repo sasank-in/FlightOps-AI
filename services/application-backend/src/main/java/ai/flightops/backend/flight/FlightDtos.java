@@ -31,11 +31,18 @@ public final class FlightDtos {
             Map<String, Object> metadata,
             @NotEmpty List<@Valid WindowUpload> windows) {}
 
+    /** Latest analysis run of a flight, for list views (null counts until the run completes). */
+    public record LatestAnalysis(long id, String status, Integer nAboveThreshold, Integer nWindows) {}
+
     public record FlightSummary(long id, String externalFlightReference, String datasetId, int nWindows,
-                                long ownerId, Instant createdAt) {
+                                long ownerId, Instant createdAt, LatestAnalysis latestAnalysis) {
         static FlightSummary of(Flight f) {
+            return of(f, null);
+        }
+
+        static FlightSummary of(Flight f, LatestAnalysis latest) {
             return new FlightSummary(f.getId(), f.getExternalFlightReference(), f.getDatasetId(), f.getNWindows(),
-                    f.getOwnerId(), f.getCreatedAt());
+                    f.getOwnerId(), f.getCreatedAt(), latest);
         }
     }
 
